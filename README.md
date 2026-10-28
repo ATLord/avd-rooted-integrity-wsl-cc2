@@ -1,129 +1,184 @@
-<div align="center">
+# Windows x86-64 Android 模拟器：中文使用说明
 
-# x86-64 WSL2 adaptation
+本项目是在 Windows x86-64 电脑上，通过 WSL2 Ubuntu 构建并运行 Root Android 模拟器的实验方案。它基于上游 [AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity) 的提交 `2b9e1051cc6903522f0397b240d40c1c09f744a4`，针对 x86-64 系统镜像和内核进行了适配。上游英文说明保留在 [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)；上游的 ARM64 使用方法及完整性结果不能直接视为本项目的结果。
 
-此目录包含基于上游项目的 Windows x86-64 / WSL2 实验移植。请先阅读 [x86 使用与复现指南](x86/README.md)。上游原文如下；其 ARM64 使用说明与完整性结果不能直接套用到本移植。
+> **请先阅读：** 本项目目前不是一键开箱即用。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。模拟器与 Root 已验证，实际 Play Integrity 判定尚未验证。
 
-# Rooted Pixel AVD · Play Integrity
+## 目录
 
-**A reproducible recipe for a rooted Pixel-class Android emulator (AVD) that passes Google Play Integrity.**
+- [当前结果和限制](#当前结果和限制)
+- [环境准备与安装](#准备环境)
+- [构建和创建模拟器](#构建和创建模拟器)
+- [模块和项目配置](#模块和项目配置)
+- [日常启动、关闭和诊断](#日常启动关闭和诊断)
+- [常见问题](#常见问题)
+- [目录与脚本说明](#目录与脚本说明)
 
-[![Verdict](https://img.shields.io/badge/Play_Integrity-MEETS__STRONG__INTEGRITY-7c5cff?style=flat-square)](docs/INTEGRITY_CHAIN.md)
-[![Play Protect](https://img.shields.io/badge/Play_Protect-certified-3fd07f?style=flat-square)](docs/INTEGRITY_CHAIN.md)
-[![Device](https://img.shields.io/badge/device-Pixel_9_·_android--36-4f8cff?style=flat-square)](device/pif/custom.pif.prop)
-[![Kernel](https://img.shields.io/badge/kernel-custom_6.6_·_KSU--Next_+_SUSFS-7c5cff?style=flat-square)](kernel-build/)
-[![Type](https://img.shields.io/badge/contents-source_+_scripts_only-6b7689?style=flat-square)](#scope)
+当前验证配置：Android 36 Google Play x86_64 系统镜像 revision 7，Pixel 9 Pro XL AVD，6.6.66 自定义内核，KernelSU-Next 3.2.0、SUSFS 2.1.0、ReZygisk 1.0.0、PlayIntegrityFork v16、TEESimulator 3.2。内核配置来自该原厂镜像的 `/proc/config.gz`。不同镜像修订版可能有不兼容的内核模块；创建脚本只接受 revision 7。SDK 当前下载不保证将来仍是该版本。
 
-🌐 **[Live site &amp; overview →](https://tanishmeh.github.io/AVD_Rooted_Integrity/)**
+## 当前结果和限制
 
-<img src="media/play-integrity-verdict.png" alt="Play Integrity verdict — MEETS_STRONG_INTEGRITY on a rooted Pixel 9 Pro XL AVD" width="300" />
+- Android 启动、KVM、ADB Root、ReZygisk 和 TEESimulator 进程已在本机验证；项目的结构检查通过。
+- **没有取得实际的 Play Integrity 判定**。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
+- 原 SUSFS 模块的 `ksu_susfs` 是 ARM64 原生可执行文件，在 x86_64 系统中执行失败；不能假设 SUSFS 用户空间功能完整。
+- WSLg 中模拟器右侧栏可能无法点击，Windows 与模拟器的复制粘贴也未解决。Windows 原生窗口方案尚未实现。
+- 网络必须分别验证；当前环境曾能访问百度和 Google 连通性检测地址，但 Google 主站及认证状态接口连接失败。
+- 项目脚本按上游要求在模拟器内将 keybox 设为 **0644**，同一设备上的其他进程可能读取其中的私钥。只在隔离的测试设备中使用；不要提交、分享或在聊天中粘贴 keybox。
+- 不提供 keybox，也没有确认它是否有效或被撤销。不要在运行中的生产设备或其他用户 AVD 上运行安装脚本。
 
-</div>
+## 准备环境
 
----
+需要 Windows x86-64、WSL2 Ubuntu 22.04、足够的磁盘空间（Docker 数据盘所在的磁盘首次构建至少预留 20 GB，项目所在盘也需要空间）、Docker Desktop 的 Linux 引擎、Windows Git、WSL 中 Java 17、curl、unzip。Docker 默认数据盘可能在 C 盘，即使项目在 F 盘也会消耗 C 盘。Docker 和 Git 需要访问源码上游。内核构建从 Windows PowerShell 执行；模拟器运行在 WSL。
 
-A reproducible recipe for a **rooted Pixel-class Android emulator (AVD) that
-passes Google Play Integrity all the way to `MEETS_STRONG_INTEGRITY`** (Play
-Protect certified) and presents as real Pixel hardware to apps. No StrongBox
-hardware required — TEESimulator forges the full attestation chain from your
-own keybox, so the verdict reaches **strong** integrity, not just device.
+### 1. 安装 Windows 工具
 
-It combines a custom kernel (KernelSU-Next + SUSFS + anti-emulator source
-patches) with an on-device `/data/adb/` setup (prop spoofs, attestation-chain
-forging via TEESimulator + a keybox, `/proc` bind mounts, and root-module
-hiding).
+这部分目前需要使用者自行安装，**不是一键自动安装**：
 
-> **This is a development/testing tool** for reproducing strong-integrity device
-> behavior on an emulator. Bring your own keybox.
+1. 在 Windows 设置或固件中确认硬件虚拟化可用。按照 [微软 WSL 安装说明](https://learn.microsoft.com/windows/wsl/install) 安装 WSL2 和 Ubuntu 22.04；例如在管理员 PowerShell 中运行 `wsl --install -d Ubuntu-22.04`，如系统提示请重启，首次启动 Ubuntu 时创建 Linux 用户。用 `wsl -l -v` 检查发行版版本为 2。
+2. 安装并启动 [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/)，启用 Linux/WSL2 引擎；确保 `docker info` 可用。首次创建编译镜像可能需要下载几 GB。
+3. 安装 [Git for Windows](https://git-scm.com/install/windows)，在 PowerShell 中确认 `git --version` 可用。
+4. 在 GitHub 获得此私有仓库的访问权限，然后克隆。拥有私有仓库链接并不自动意味着有访问权限：
 
-## What's here
+   ```powershell
+   New-Item -ItemType Directory -Force F:\test | Out-Null
+   cd F:\test
+   git clone https://github.com/ATLord/avd-rooted-integrity-x86.git
+   cd avd-rooted-integrity-x86
+   ```
 
-| Path | What |
-|---|---|
-| [`kernel-build/`](kernel-build/) | Docker + scripts that build AOSP `common-android15-6.6` with KSU-Next, SUSFS, module-vermagic bypass, and `/proc/{modules,cpuinfo}` + banner spoofs. Output: `out/Image.gz`. |
-| [`device/data_adb/`](device/) | The on-device setup pushed to `/data/adb`: `post-fs-data.d/` prop spoofs + bind mounts, `service.d/` watchdogs, SUSFS rules, `avd-fake/` fakes, and TrickyStore config. |
-| [`device/pif/`](device/pif/) | PlayIntegrityFork profile (Pixel 9 / `tokay` / CANARY). |
-| [`device/avd-config/`](device/avd-config/) | Host-side `config.ini` + `advancedFeatures.ini` templates (the critical Wi-Fi flags). |
-| [`device/modules.md`](device/modules.md) | Prerequisite root modules + where to get them (not vendored). |
-| [`scripts/`](scripts/) | `start_avd.sh` (cold-boot with the custom kernel), `install-device-setup.sh` (push the setup + keybox to a rooted AVD), and `verify-integrity.sh` (read-only health check, incl. the GENERATE-vs-PATCH mode check). |
-| [`docs/`](docs/) | [`REPRODUCTION.md`](docs/REPRODUCTION.md) — step-by-step. [`INTEGRITY_CHAIN.md`](docs/INTEGRITY_CHAIN.md) — why each layer matters. |
+   这里 `F:\test` 只是示例，可选择自己的工作目录；克隆时根据 GitHub 提示完成认证。若项目位于 F 盘，Ubuntu 中的对应路径通常以 `/mnt/f/` 开头。
 
-## Quick start
+### 2. 安装 Ubuntu 依赖与 Android SDK
 
-```bash
-# 1. Build the kernel (Docker; ~10 GB, 5-25 min)
-#    The kbuild-sources named volume is required on macOS (case-insensitive FS) —
-#    see kernel-build/README.md.
-cd kernel-build && docker build -t kbuild . && \
-  docker run --rm -v "$PWD":/work -v kbuild-sources:/work/sources \
-    -w /work kbuild ./scripts/build-all.sh && cd ..
-
-# 2. Provide your keybox (gitignored — never commit a real one)
-cp /path/to/your/keybox.xml device/data_adb/tricky_store/keybox.xml
-
-# 3. Boot the AVD with the custom kernel
-./scripts/start_avd.sh
-
-# 4. Install the root modules (see device/modules.md), then:
-./scripts/install-device-setup.sh
-
-# 5. Reboot clean and check Play Integrity.
-```
-
-Full walkthrough: [`docs/REPRODUCTION.md`](docs/REPRODUCTION.md).
-
-## ⚠️ The two traps that waste days (read before debugging)
-
-If integrity "randomly" stops working, it is almost always one of these:
-
-1. **Never manually restart `keymint` / `keystore2` / `TEESimulator`.** It feels
-   like the right move (and old guides say to), but it flips TEESimulator from
-   **GENERATE** mode (valid keybox chain) into **PATCH** mode (a chain Google
-   rejects) → empty verdict. **To apply any change, cold reboot. Recovery from a
-   broken verdict is also just a cold reboot — never a service restart.**
-2. **Never run `autopif`.** It overwrites the pinned Pixel 9 (`tokay`)
-   `custom.pif.prop` with a drifting profile (e.g. `felix`/Pixel Fold) whose
-   fingerprint doesn't match → verdict fails.
-
-After a clean boot, confirm TEESimulator is in GENERATE mode:
+在 WSL 的 Ubuntu 中安装依赖（如果尚未安装）：
 
 ```bash
-./scripts/verify-integrity.sh    # read-only; checks GENERATE-vs-PATCH and more
+sudo apt update
+sudo apt install -y openjdk-17-jre-headless curl unzip git
 ```
 
-The full story is in [`docs/REPRODUCTION.md` §7–§9](docs/REPRODUCTION.md) and
-[`docs/INTEGRITY_CHAIN.md` "Layer 1b"](docs/INTEGRITY_CHAIN.md).
+以下 WSL 命令假设项目克隆到 `F:\test\avd-rooted-integrity-x86`；换目录时请相应修改路径。
 
-## The keybox (read this)
+```bash
+cd /mnt/f/test/avd-rooted-integrity-x86
+bash x86/scripts/install-sdk.sh
+```
 
-TrickyStore/TEESimulator forges the hardware attestation chain from
-`device/data_adb/tricky_store/keybox.xml`. That file is **`.gitignored`** and is
-**not** in this repo — a keybox committed to a public repo gets harvested and
-revoked by Google within hours, after which integrity stops verifying. Use
-[`keybox.xml.example`](device/data_adb/tricky_store/keybox.xml.example) as the
-format reference and **supply your own** — this is the one thing you must
-provide. Because TEESimulator forges a complete, internally-consistent chain
-rooted in Google's attestation root from that keybox, this setup reaches
-**`MEETS_STRONG_INTEGRITY`** on a pure emulator — no StrongBox hardware needed.
+SDK 安装脚本使用 Google 官方命令行工具并校验 SHA-256；许可协议由使用者在提示中自行阅读和接受。
 
-## Scope
+### 3. 启用 KVM
 
-- ✅ **Full `MEETS_STRONG_INTEGRITY`** (no StrongBox — just your keybox +
-  TEESimulator): custom kernel, prop/`/proc` spoofing, attestation forging,
-  root hiding, `virt_wifi` networking — everything the strong verdict needs.
-- ❌ **No APKs / no sensor-name spoofing** — the Goldfish sensor vendor strings
-  remain (a known gap; not required for the verdict).
-- ❌ **No carrier/eSIM provisioning** — out of scope.
-- ❌ **No prebuilt binaries / device images** — source + scripts only.
+KVM 需要可用的嵌套虚拟化。在 Ubuntu 终端中运行（以下适用于 Intel 主机）：
 
-## Validated configuration
+```bash
+sudo modprobe kvm_intel
+sudo usermod -aG kvm "$USER"
+sudo chgrp kvm /dev/kvm
+sudo chmod 660 /dev/kvm
+```
 
-Pixel 9 (`tokay`) CANARY profile, android-36 `google_apis_playstore arm64-v8a`,
-custom 6.6 kernel. Module versions this was validated against are in
-[`device/modules.md`](device/modules.md).
+退出并重新进入 Ubuntu 终端后组权限生效。AMD 主机需要根据实际环境使用 `kvm_amd`。这些 `/dev/kvm` 权限可能在 WSL 重启后需要重新设置；不要对不支持嵌套虚拟化的环境假定 KVM 可用。
 
-## Credits
+## 构建和创建模拟器
 
-KernelSU-Next, SUSFS (simonpunk), Wild Kernels, TEESimulator (JingMatrix),
-PlayIntegrityFork (osm0sis/chiteroman), ReZygisk (PerformanC), Vector
-(JingMatrix). See `device/modules.md` for links.
+在 Windows PowerShell 中：
+
+```powershell
+cd F:\test\avd-rooted-integrity-x86
+.\x86\build.ps1
+```
+
+首次会下载源码并编译，产物是 `x86/out/bzImage-x86_64`。源码保存在专用 Docker volume `avd-integrity-x86-sources`，与原先的临时 volume 分开。构建脚本锁定 SUSFS、KernelSU、AOSP 和 Wild 补丁版本；容器镜像基于 Ubuntu 24.04 软件源，因此不同构建时间的编译器包版本可能不同，不保证二进制哈希相同。脚本检查 BTF 配置以保证模块结构所需的选项没有被自动关闭。不要在不可信的内核或模块上依赖此实验性的模块版本检查绕过。
+
+在 WSL 中：
+
+```bash
+cd /mnt/f/test/avd-rooted-integrity-x86
+bash x86/scripts/create-avd.sh
+bash x86/scripts/doctor.sh
+bash x86/scripts/start.sh
+```
+
+创建脚本拒绝覆盖同名 AVD；如已有 AVD，请先确认它确实是需要使用的设备。启动脚本使用端口 5554、不加载快照和上述自定义内核，并在开机后尝试连接 `VirtWifi`；图形界面依赖 WSLg。请在安装或重启前先同步模拟器数据，避免强制结束导致写入丢失。
+
+## 模块和项目配置
+
+模拟器正常开机后，在另一个 WSL 终端运行：
+
+```bash
+cd /mnt/f/test/avd-rooted-integrity-x86
+bash x86/scripts/install-modules.sh
+```
+
+脚本从项目列出的第三方版本下载文件并核对本次已验证的 SHA-256。它先安装 KernelSU 管理器；如果 Shell 还没有 Root，打开管理器，在 **Superuser → Shell** 启用 Superuser，然后重跑命令。模块安装后重启 Android，等待完全开机。
+
+将自己的 keybox 保存到安全的本机位置，然后：
+
+```bash
+bash x86/scripts/configure-device.sh /mnt/f/keybox.xml
+# 使用模拟器内重启或下面的 adb 命令；不要重启 keymint、keystore2 或 TEESimulator 服务
+"$HOME/Android/Sdk/platform-tools/adb" -s emulator-5554 reboot
+# 等待 Android 完全启动后再检查
+bash x86/scripts/check-device.sh
+bash x86/scripts/check-network.sh
+```
+
+配置脚本直接读取你指定的 keybox，并把它写入模拟器；不会把它复制到项目目录，原始文件也不会被删除。模拟器内的 keybox 不会随本项目版本库分发。请勿把真实 keybox 放进 Docker 构建上下文或提交到 Git。
+
+安装模块、配置脚本和实际 Play Integrity 检查会改动测试 AVD；本项目仅针对指定测试 AVD。`check-device.sh` 输出的上游检查可能以零退出码报告失败，需要查看每项结果；它不会生成 Google 的认证判定，也不会证明 keybox 有效。
+
+## 日常启动、关闭和诊断
+
+以后使用时，先确保 Docker 不用于构建也可以正常启动模拟器；但 WSL/KVM 必须可用。打开 Ubuntu，进入项目目录：
+
+```bash
+cd /mnt/f/test/avd-rooted-integrity-x86
+bash x86/scripts/doctor.sh
+bash x86/scripts/start.sh
+```
+
+`start.sh` 默认使用端口 5554。窗口启动后保持该终端运行；它会尝试在设备开机后连接 `VirtWifi`，但 Wi-Fi 自动连接并非每次都已验证成功。可在另一个 Ubuntu 终端运行 `bash x86/scripts/check-network.sh` 检查联网情况。关闭前在 Android 系统中保存工作；需要重启设备时优先使用 Android 内的重启或上面的 `adb reboot`，以避免未完成的写入丢失。
+
+## 常见问题
+
+### 提示 KVM 不可用
+
+运行 `bash x86/scripts/doctor.sh` 并检查 `/dev/kvm` 是否可读写。确认宿主机虚拟化和 WSL 嵌套虚拟化可用，再按上面的步骤加载对应 CPU 的 KVM 模块。WSL 重启后设备权限可能需要重新设置。
+
+### Docker 构建失败或磁盘空间不足
+
+先确认 Docker Desktop 已启动，`docker info` 能返回结果。`build.ps1` 会尝试检查默认 Docker 数据盘所在分区是否有至少 20 GB 空间；如果 Docker 数据盘使用了其他位置，请自行检查对应分区。不要为了清理空间随意删除其他项目的 Docker volume。
+
+### 已有同名 AVD 或端口被占用
+
+创建脚本不会覆盖已有的 `Pixel_9_Pro_XL_x86`。先确认该设备是否为本项目创建的测试设备，再决定继续使用或选择其他 AVD 名称。启动脚本固定使用端口 5554；安装和诊断脚本默认使用 `emulator-5554`。更改 `AVD_NAME` 或 `ANDROID_SERIAL` 后，需要确保目标一致。
+
+### Wi-Fi、Google 服务或剪贴板异常
+
+先运行 `bash x86/scripts/check-network.sh`。能访问某个网站不代表所有 Google 服务均可访问；DNS、代理和宿主机网络均可能影响结果。若 Wi-Fi 未自动连接，可在模拟器内打开 Wi-Fi 并选择 `VirtWifi`。WSLg 下右侧栏不可点击以及 Windows 与模拟器之间复制粘贴异常，目前仍是已知限制。
+
+### SUSFS 报错或结构检查全绿
+
+模块附带的 `ksu_susfs` 是 ARM64 可执行文件，当前 x86-64 模拟器不能直接运行；内核识别到 SUSFS 不表示全部用户空间规则已生效。项目的结构检查、TEESimulator 进程和 Root 状态也不等于真实的 Play Integrity 服务器判定。
+
+### 如何安全处理 keybox
+
+由使用者自行保管 keybox。仓库忽略真实 `keybox.xml`，配置命令从指定的本地路径直接读取。按上游方案写入测试模拟器后文件权限为 0644，设备上的其他进程可能读取私钥，因此不要在生产设备或包含敏感数据的设备上使用。项目不验证 keybox 是否有效或已撤销。
+
+## 目录与脚本说明
+
+| 路径 | 作用 |
+| --- | --- |
+| `x86/README.md` | 指向本中文使用说明的入口 |
+| `x86/build.ps1` | Windows 上准备 Docker 构建环境并构建 x86 内核 |
+| `x86/config/`、`x86/scripts/patch-kernelsu.py` | 已验证的原厂内核配置和 x86 兼容修改 |
+| `x86/scripts/install-sdk.sh` | 下载并校验 Android 命令行工具，安装 SDK 组件 |
+| `x86/scripts/create-avd.sh`、`start.sh` | 创建和启动测试模拟器 |
+| `x86/scripts/install-modules.sh`、`configure-device.sh` | 安装模块并配置使用者提供的 keybox |
+| `x86/scripts/doctor.sh`、`check-device.sh`、`check-network.sh` | 环境、设备和网络诊断 |
+| `kernel-build/`、`device/`、`scripts/` | 保留的上游构建与设备配置 |
+| `docs/UPSTREAM_README.md` | 上游英文说明 |
+
+## 本机保留的文件
+
+`x86/out/`、`x86/downloads/` 和 `x86/cache/` 都被 Git 忽略。当前工作区中的产物和下载包可以复用，但复制或提交项目时默认不会包含它们；新机器应按上述步骤重新构建、下载。可用 `KERNEL`、`ANDROID_SDK_ROOT`、`AVD_NAME` 和 `ANDROID_SERIAL` 覆盖对应设置；启动脚本固定端口 5554。
