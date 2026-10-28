@@ -1,5 +1,9 @@
 <div align="center">
 
+# x86-64 WSL2 adaptation
+
+此目录包含基于上游项目的 Windows x86-64 / WSL2 实验移植。请先阅读 [x86 使用与复现指南](x86/README.md)。上游原文如下；其 ARM64 使用说明与完整性结果不能直接套用到本移植。
+
 # Rooted Pixel AVD · Play Integrity
 
 **A reproducible recipe for a rooted Pixel-class Android emulator (AVD) that passes Google Play Integrity.**

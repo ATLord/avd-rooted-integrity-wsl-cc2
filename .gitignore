@@ -27,6 +27,15 @@ Image.gz
 *.so
 *.dex
 
+# Local x86 build inputs, kernel outputs and credentials.
+x86/out/
+x86/cache/
+x86/keybox.xml
+x86/downloads/
+__pycache__/
+*.pyc
+/.ccache/
+
 # ============================================================================
 # Host / OS / editor cruft
 # ============================================================================

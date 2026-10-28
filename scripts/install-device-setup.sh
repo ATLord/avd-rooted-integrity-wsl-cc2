@@ -8,8 +8,8 @@
 # What it does:
 #   1. Pushes post-fs-data.d/, service.d/, avd-fake/, susfs4ksu/ configs, and
 #      tricky_store/ configs into /data/adb/.
-#   2. Installs your keybox (device/data_adb/tricky_store/keybox.xml) at
-#      /data/adb/tricky_store/keybox.xml with 0600 root:root.
+#   2. Installs your keybox (KEYBOX or device/data_adb/tricky_store/keybox.xml)
+#      at /data/adb/tricky_store/keybox.xml with 0644 root:root.
 #   3. Fixes exec bits and ownership.
 #
 # It does NOT install KSU-Next, the kernel, or the Magisk/KSU modules
@@ -19,7 +19,7 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 DATA_ADB="$REPO_ROOT/device/data_adb"
-KEYBOX="$DATA_ADB/tricky_store/keybox.xml"
+KEYBOX="${KEYBOX:-$DATA_ADB/tricky_store/keybox.xml}"
 PIF_PROFILE="$REPO_ROOT/device/pif/custom.pif.prop"
 
 command -v adb >/dev/null 2>&1 || { echo "ERROR: adb not on PATH" >&2; exit 1; }
@@ -62,7 +62,11 @@ adb push "$DATA_ADB/post-fs-data.d" "$STAGE/" >/dev/null
 adb push "$DATA_ADB/service.d"      "$STAGE/" >/dev/null
 adb push "$DATA_ADB/avd-fake"       "$STAGE/" >/dev/null
 adb push "$DATA_ADB/susfs4ksu"      "$STAGE/susfs4ksu" >/dev/null
-adb push "$DATA_ADB/tricky_store"   "$STAGE/tricky_store" >/dev/null
+adb shell "mkdir -p $STAGE/tricky_store"
+adb push "$DATA_ADB/tricky_store/target.txt" "$STAGE/tricky_store/target.txt" >/dev/null
+adb push "$DATA_ADB/tricky_store/security_patch.txt" "$STAGE/tricky_store/security_patch.txt" >/dev/null
+adb push "$DATA_ADB/tricky_store/tee_status.txt" "$STAGE/tricky_store/tee_status.txt" >/dev/null
+adb push "$KEYBOX" "$STAGE/tricky_store/keybox.xml" >/dev/null
 adb push "$PIF_PROFILE"             "$STAGE/custom.pif.prop" >/dev/null
 
 echo "==> installing into /data/adb (as root)"
