@@ -1,14 +1,14 @@
-# Windows x86-64 Android 模拟器：自动 Root 版
+# WSL x86-64 Android 模拟器：界面修复版
 
 本项目是在 Windows x86-64 电脑上，通过 WSL2 Ubuntu 构建并运行 Root Android 模拟器的实验方案。它基于上游 [AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity) 的提交 `2b9e1051cc6903522f0397b240d40c1c09f744a4`，针对 x86-64 系统镜像和内核进行了适配。上游英文说明保留在 [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)；上游的 ARM64 使用方法及完整性结果不能直接视为本项目的结果。
 
 > **请先阅读：** 本项目仅支持通过 WSL2 运行，尚非一键安装。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。已在同一台电脑的全新 Ubuntu 22.04 实例中测试构建、启动、自动 ADB Shell Root、模块和 XML 配置；尚未在另一台干净电脑上验证。
 
-独立仓库：[avd-rooted-integrity-windows-autoroot](https://github.com/ATLord/avd-rooted-integrity-windows-autoroot)（私有仓库，需获得访问权限）。仓库名称保留原样，实际使用方式为 Windows 上的 WSL2 Ubuntu。
+本仓库是 [WSL 自动 Root 版](https://github.com/ATLord/avd-rooted-integrity-windows-autoroot) 的独立界面修复版，不改变原仓库。模拟器、Android 系统和内核仍运行在 WSL；窗口通过 Windows 上的 VcXsrv 显示。
 
 本版本在启动测试 AVD 时启用 KernelSU 的 `allow_shell` 参数，并由模块安装脚本自动启动管理器并取得 ADB Shell Root，无需在管理器中手动授权。此设置授予 ADB Shell Root；不自动授予普通应用 Root。请仅用于自己的测试 AVD。
 
-如果原版模拟器已经打开，先正常关闭它，再从本版本运行 `start.sh`；仅在 Android 内重启无法给已经运行的模拟器追加新的启动参数。
+如果原版模拟器已经打开，先正常关闭它，再从本版本运行 `start-x11.sh`；仅在 Android 内重启无法给已经运行的模拟器追加新的启动参数。
 
 首次安装建议阅读 **[从零安装操作手册（详细版）](docs/INSTALLATION.zh-CN.md)**，其中区分了 Windows PowerShell 和 Ubuntu 命令，并给出每步检查方法及常见错误处理。
 
@@ -31,7 +31,7 @@
 - 在本机独立的全新 Ubuntu 实例中，从仓库克隆、安装 SDK revision 7、编译内核、启动 Android、自动 ADB Root、安装模块及配置 XML 已验证；Android 重启后 Root、XML 和 VirtWifi 自动连接也已检查。模块下载使用了针对本机网络临时配置的代理，其他网络环境需自行确认。
 - 没有验证本 WSL 版本在新电脑上的 Play Integrity 判定。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
 - 原 SUSFS 模块的 `ksu_susfs` 是 ARM64 原生可执行文件，在 x86_64 系统中执行失败；不能假设 SUSFS 用户空间功能完整。
-- WSLg 中模拟器右侧栏可能无法点击，Windows 与模拟器的复制粘贴也可能异常，目前尚未在 WSL 方案中解决。
+- 使用 `start-x11.sh` 启动的独立测试 AVD 中，用户已在本机确认右侧栏和 Windows↔Android 双向文本复制粘贴可用。其他电脑还需要自行验证；直接使用 `start.sh` 的 WSLg 窗口仍可能出现原问题。
 - 网络必须分别验证；当前环境曾能访问百度和 Google 连通性检测地址，但 Google 主站及认证状态接口连接失败。
 - 项目脚本按上游要求在模拟器内将 keybox 设为 **0644**，同一设备上的其他进程可能读取其中的私钥。只在隔离的测试设备中使用；不要提交、分享或在聊天中粘贴 keybox。
 - 不提供 keybox，也没有确认它是否有效或被撤销。不要在运行中的生产设备或其他用户 AVD 上运行安装脚本。
@@ -41,7 +41,7 @@
 | 前置条件 | 说明 |
 | --- | --- |
 | 电脑与虚拟化 | Windows x86-64；CPU 虚拟化已开启。若 Windows 本身运行在虚拟机中，还需要宿主机提供嵌套虚拟化。 |
-| WSL | WSL2、Ubuntu 22.04、可用的 `/dev/kvm` 和 WSLg 图形支持。模拟器运行在 WSL 中。 |
+| WSL | WSL2、Ubuntu 22.04、可用的 `/dev/kvm` 和 WSL 与 Windows 之间的网络通信。模拟器运行在 WSL 中。 |
 | 构建与图形依赖 | Windows 上安装 Git 和使用 Linux 引擎的 Docker Desktop；Ubuntu 中安装 Java 17、curl、unzip、git、python3 和模拟器的音频/X11 库（见下方命令）。 |
 | 空间 | 首次内核构建前，Docker 数据盘至少留出 20 GB；Ubuntu、SDK、模拟器数据和项目还需要额外空间。项目放在 F 盘不代表 Docker 不占 C 盘。 |
 | 网络 | 需要能访问 GitHub、Google Android SDK 和项目使用的源码、模块发布源；Google Play 服务连通性也要单独检查。 |
@@ -62,7 +62,7 @@
    ```powershell
    New-Item -ItemType Directory -Force F:\test | Out-Null
    cd F:\test
-   git clone https://github.com/ATLord/avd-rooted-integrity-windows-autoroot.git avd-rooted-integrity-autoroot
+   git clone https://github.com/ATLord/avd-rooted-integrity-wsl-ui.git avd-rooted-integrity-autoroot
    cd avd-rooted-integrity-autoroot
    ```
 
@@ -74,7 +74,7 @@
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-17-jre-headless curl unzip git python3 libpulse0 libxi6 libxkbfile1 libsm6 libice6
+sudo apt install -y openjdk-17-jre-headless curl unzip git python3 libpulse0 libxi6 libxkbfile1 libsm6 libice6 p7zip-full xauth x11-utils
 ```
 
 以下 WSL 命令假设项目位于 `F:\test\avd-rooted-integrity-autoroot`；换目录时请相应修改路径。
@@ -82,9 +82,10 @@ sudo apt install -y openjdk-17-jre-headless curl unzip git python3 libpulse0 lib
 ```bash
 cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/install-sdk.sh
+bash x86/scripts/install-xserver.sh
 ```
 
-SDK 安装脚本使用 Google 官方命令行工具并校验 SHA-256；许可协议由使用者在提示中自行阅读和接受。
+SDK 安装脚本使用 Google 官方命令行工具并校验 SHA-256；许可协议由使用者在提示中自行阅读和接受。显示组件脚本下载 VcXsrv 官方版本并校验 SHA-256，解压到被 Git 忽略的 `x86/xserver/`。
 
 ### 3. 启用 KVM
 
@@ -116,10 +117,10 @@ cd F:\test\avd-rooted-integrity-autoroot
 cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/create-avd.sh
 bash x86/scripts/doctor.sh
-bash x86/scripts/start.sh
+bash x86/scripts/start-x11.sh
 ```
 
-创建脚本拒绝覆盖同名 AVD；如已有 AVD，请先确认它确实是需要使用的设备。启动脚本使用端口 5554、不加载快照和上述自定义内核，并在首次开机及 Android 重启后尝试连接 `VirtWifi`；图形界面依赖 WSLg。请在安装或重启前先同步模拟器数据，避免强制结束导致写入丢失。
+创建脚本拒绝覆盖同名 AVD；如已有 AVD，请先确认它确实是需要使用的设备。`start-x11.sh` 启动带独立认证的 VcXsrv，再调用 WSL 的 `start.sh`；模拟器端口为 5554，并在首次开机及 Android 重启后尝试连接 `VirtWifi`。保持启动终端打开，关闭模拟器后显示服务会随之退出。
 
 ## 模块和项目配置
 
@@ -130,7 +131,7 @@ cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/install-modules.sh
 ```
 
-脚本从项目列出的第三方版本下载文件并核对 SHA-256，自动安装并启动 KernelSU 管理器，确认 ADB Shell Root 后安装模块。不需要手动进入管理器授权。必须使用本版本的 `start.sh` 启动测试 AVD，才能启用自动授权。模块安装后重启 Android，等待完全开机。
+脚本从项目列出的第三方版本下载文件并核对 SHA-256，自动安装并启动 KernelSU 管理器，确认 ADB Shell Root 后安装模块。不需要手动进入管理器授权。`start-x11.sh` 会调用本版本的 `start.sh` 启用自动授权。模块安装后重启 Android，等待完全开机。
 
 将自己的 keybox 保存到安全的本机位置，然后：
 
@@ -154,10 +155,10 @@ bash x86/scripts/check-network.sh
 ```bash
 cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/doctor.sh
-bash x86/scripts/start.sh
+bash x86/scripts/start-x11.sh
 ```
 
-`start.sh` 默认使用端口 5554。窗口启动后保持该终端运行；它会尝试在设备首次开机及 Android 重启后连接 `VirtWifi`，本机已验证连接，其他机器的连接仍取决于系统和网络状态。可在另一个 Ubuntu 终端运行 `bash x86/scripts/check-network.sh` 检查联网情况。关闭前在 Android 系统中保存工作；需要重启设备时优先使用 Android 内的重启或上面的 `adb reboot`，以避免未完成的写入丢失。
+`start-x11.sh` 默认使用 X 显示号 3 和模拟器端口 5554。窗口启动后保持终端运行；它会尝试在首次开机及 Android 重启后连接 `VirtWifi`。显示服务使用每次启动生成的 X11 认证，不使用关闭访问控制的 `-ac`。如果 X 端口被占用，可设置 `AVD_X11_DISPLAY` 为其他显示号；不同防火墙环境可能需要允许 WSL 连接该显示服务，不需要关闭防火墙。
 
 ## 常见问题
 
@@ -175,7 +176,7 @@ bash x86/scripts/start.sh
 
 ### Wi-Fi、Google 服务或剪贴板异常
 
-先运行 `bash x86/scripts/check-network.sh`。能访问某个网站不代表所有 Google 服务均可访问；DNS、代理和宿主机网络均可能影响结果。若 Wi-Fi 未自动连接，可在模拟器内打开 Wi-Fi 并选择 `VirtWifi`。WSLg 下右侧栏不可点击以及 Windows 与模拟器之间复制粘贴异常，目前仍是已知限制。
+先运行 `bash x86/scripts/check-network.sh`。能访问某个网站不代表所有 Google 服务均可访问；DNS、代理和宿主机网络均可能影响结果。若 Wi-Fi 未自动连接，可在模拟器内打开 Wi-Fi 并选择 `VirtWifi`。如侧栏或剪贴板异常，确认是通过 `start-x11.sh` 启动，并检查 VcXsrv 与 WSL 的连接；不要关闭 Windows 防火墙来解决问题。
 
 ### SUSFS 报错或结构检查全绿
 
@@ -194,6 +195,7 @@ bash x86/scripts/start.sh
 | `x86/config/`、`x86/scripts/patch-kernelsu.py` | 已验证的原厂内核配置和 x86 兼容修改 |
 | `x86/scripts/install-sdk.sh` | 下载并校验 Android 命令行工具，安装 SDK 组件 |
 | `x86/scripts/create-avd.sh`、`start.sh` | 创建和启动测试模拟器 |
+| `x86/scripts/install-xserver.sh`、`start-x11.sh` | 准备并启动用于窗口与剪贴板的显示服务 |
 | `x86/scripts/install-modules.sh`、`configure-device.sh` | 安装模块并配置使用者提供的 keybox |
 | `x86/scripts/doctor.sh`、`check-device.sh`、`check-network.sh` | 环境、设备和网络诊断 |
 | `kernel-build/`、`device/`、`scripts/` | 保留的上游构建与设备配置 |

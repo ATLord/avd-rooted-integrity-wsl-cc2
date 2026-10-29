@@ -6,7 +6,7 @@
 
 ## 1. 准备工作
 
-先按照 [安装手册](INSTALLATION.zh-CN.md)完成环境准备，使用本版本的 `start.sh` 启动 AVD，并运行 `install-modules.sh` 安装模块。模块安装后重启 Android，等系统完全启动。
+先按照 [安装手册](INSTALLATION.zh-CN.md)完成环境准备，使用本版本的 `start-x11.sh` 启动 AVD，并运行 `install-modules.sh` 安装模块。模块安装后重启 Android，等系统完全启动。
 
 在另一个 Ubuntu 终端执行：
 
@@ -81,7 +81,7 @@ bash x86/scripts/check-network.sh
 - `Usage: configure-device.sh ...`：没有提供路径或文件不存在；检查路径、盘符和文件扩展名。
 - `Invalid keybox structure`：文件不是预期的 XML 结构；检查你自己的文件，别把密钥内容发出来。
 - 找不到 `playintegrityfix`：先运行 `install-modules.sh` 并重启，等模块激活后再配置 XML。
-- `su` 不可用：确认通过本版本 `start.sh` 启动，并在 Android 完全启动后运行 `install-modules.sh`。
+- `su` 不可用：确认通过本版本 `start-x11.sh` 启动，并在 Android 完全启动后运行 `install-modules.sh`。
 - 结构检查通过但没有完整性结果：需要实际发起 Play Integrity 请求并查看服务器判定；项目不承诺通过。
 
 按上游要求，模拟器内的 keybox 权限为 `0644`，设备中的其他进程可能读取私钥。请仅用于隔离的测试 AVD，不要使用生产设备的敏感密钥，也不要将真实文件提交或分享。

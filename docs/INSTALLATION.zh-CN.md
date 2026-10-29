@@ -1,12 +1,12 @@
 # Windows x86-64 模拟器从零安装操作手册
 
-> 本手册适用于 Windows 上通过 WSL2 Ubuntu 运行的模拟器。已在现有电脑的新 Ubuntu 实例中测试构建、启动、Root、模块和 XML；尚未在另一台干净电脑上完成复现，测试结果和已知局限请先看首页 README。
+> 本手册适用于 Windows 上通过 WSL2 Ubuntu 运行的模拟器。界面修复版在本机独立测试 AVD 中验证了侧栏和双向文本复制粘贴；尚未在另一台干净电脑上完成复现。
 
 本手册面向第一次在 Windows 电脑上部署本项目的使用者。按顺序执行，每一阶段先检查结果，再继续下一阶段。它也适用于通过远程桌面操作的 Windows 电脑：**所有安装命令都要在目标电脑上运行**。
 
 这是原 GitHub 项目的独立自动 Root 版本，发布在独立仓库，不会改变原仓库。不要从旧仓库克隆后假定其中已包含自动 Root 修改。
 
-> 项目目前属于实验性 x86-64 移植：模拟器启动、Root 和部分模块结构已在一台机器验证；尚未验证本 WSL 版本在新电脑上的 Google Play Integrity 结果。SUSFS 的 ARM64 用户空间工具不能直接在 x86-64 上运行。WSLg 中右侧工具栏、剪贴板和 Wi-Fi 自动连接仍可能有问题。
+> 项目目前属于实验性 x86-64 移植：尚未验证本 WSL 版本在新电脑上的 Google Play Integrity 结果；SUSFS 的 ARM64 用户空间工具不能直接在 x86-64 上运行。WSLg 原生窗口的侧栏和剪贴板可能有问题，本版本使用独立显示服务。
 
 ## 0. 阅读前先知道
 
@@ -24,7 +24,7 @@
 ### 自动和手动部分
 
 - 手动：安装 WSL、Docker Desktop、Git、Java；启用虚拟化/KVM；审阅 Android SDK 许可；准备自己的 keybox。
-- 脚本完成：下载 Android SDK、编译内核、创建 AVD、自动启用 ADB Shell Root、下载并校验模块、写入项目配置、运行检查。必须使用本版本 `start.sh` 启动才能启用自动 Root。
+- 脚本完成：下载 Android SDK 和显示组件、编译内核、创建 AVD、自动启用 ADB Shell Root、下载并校验模块、写入项目配置、运行检查。`start-x11.sh` 调用本版本 `start.sh` 并启用自动 Root。
 - 密钥：本仓库不包含真实 keybox。不要在聊天、截图或 GitHub 中发送私钥。配置脚本按上游要求把设备里的 keybox 设为 0644，同一设备上的其他进程可能读取它；只在隔离的测试设备中使用。
 
 ### 空间规划
@@ -104,7 +104,7 @@ Get-PSDrive -PSProvider FileSystem |
 ```powershell
 New-Item -ItemType Directory -Force C:\avd-work | Out-Null
 cd C:\avd-work
-git clone https://github.com/ATLord/avd-rooted-integrity-windows-autoroot.git avd-rooted-integrity-autoroot
+git clone https://github.com/ATLord/avd-rooted-integrity-wsl-ui.git avd-rooted-integrity-autoroot
 cd C:\avd-work\avd-rooted-integrity-autoroot
 dir
 ```
@@ -117,13 +117,14 @@ dir
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-17-jre-headless curl unzip git python3 libpulse0 libxi6 libxkbfile1 libsm6 libice6
+sudo apt install -y openjdk-17-jre-headless curl unzip git python3 libpulse0 libxi6 libxkbfile1 libsm6 libice6 p7zip-full xauth x11-utils
 java -version
 cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
 bash x86/scripts/install-sdk.sh
+bash x86/scripts/install-xserver.sh
 ```
 
-如果克隆在其他磁盘，替换 `cd` 路径。脚本下载 Google 官方命令行工具并检查哈希，然后提示你阅读和接受 SDK 协议，接着安装 ADB、模拟器和 Android 36 Google Play x86-64 镜像。根据你的决定在协议提示中输入 `y` 或 `n`；未接受所需协议则无法完成安装。
+如果克隆在其他磁盘，替换 `cd` 路径。SDK 脚本下载 Google 官方命令行工具并检查哈希，然后提示你阅读和接受 SDK 协议，接着安装 ADB、模拟器和 Android 36 Google Play x86-64 镜像。显示组件脚本下载并校验 VcXsrv，解压到项目的 `x86/xserver/`。根据你的决定在协议提示中输入 `y` 或 `n`；未接受所需协议则无法完成安装。
 
 安装后在 **Ubuntu** 检查：
 
@@ -184,12 +185,12 @@ Get-Item .\x86\out\bzImage-x86_64 | Select-Object FullName,Length
 cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
 bash x86/scripts/create-avd.sh
 bash x86/scripts/doctor.sh
-bash x86/scripts/start.sh
+bash x86/scripts/start-x11.sh
 ```
 
-`create-avd.sh` 拒绝覆盖已有同名 AVD；不要用强制覆盖处理不认识的现有设备。`doctor.sh` 会检查 SDK、内核文件和 KVM；如果出现 `FAIL`，先处理该项。`start.sh` 启动图形窗口并固定端口 5554；保持该终端运行，启动后另外打开一个 Ubuntu 终端进行后续操作。通过远程桌面时，WSLg 的图形窗口是否能显示取决于目标机器的 WSLg 环境。
+`create-avd.sh` 拒绝覆盖已有同名 AVD；不要用强制覆盖处理不认识的现有设备。`doctor.sh` 会检查 SDK、内核文件和 KVM；如果出现 `FAIL`，先处理该项。`start-x11.sh` 启动 Windows 显示服务并调用 WSL 模拟器，使用模拟器端口 5554；保持该终端运行，启动后另开 Ubuntu 终端进行后续操作。退出模拟器后，该显示服务也会关闭。
 
-如果原版同名 AVD 已经在运行，先正常关闭模拟器，再运行本版本 `start.sh`。本版本在模拟器进程启动时添加 Shell 自动 Root 参数，只有在 Android 内执行 `adb reboot` 不会给旧的模拟器进程添加该参数。
+如果原版同名 AVD 已经在运行，先正常关闭模拟器，再运行本版本 `start-x11.sh`。本版本在模拟器进程启动时添加 Shell 自动 Root 参数，只有在 Android 内执行 `adb reboot` 不会给旧的模拟器进程添加该参数。
 
 在另一个 **Ubuntu** 终端检查：
 
@@ -260,7 +261,7 @@ bash x86/scripts/check-network.sh
 
 ## 11. 日常使用与故障处理
 
-每次使用时，在 Ubuntu 进入项目目录后运行 `bash x86/scripts/start.sh`。WSL 重启后如 `/dev/kvm` 不可用，重复第 5 节的 KVM 模块和权限步骤。正常重启优先使用 Android 内置重启或 `adb reboot`，不要强行终止正在写入数据的模拟器。
+每次使用时，在 Ubuntu 进入项目目录后运行 `bash x86/scripts/start-x11.sh`。WSL 重启后如 `/dev/kvm` 不可用，重复第 5 节的 KVM 模块和权限步骤。正常重启优先使用 Android 内置重启或 `adb reboot`，不要强行终止正在写入数据的模拟器。
 
 | 现象 | 先检查什么 |
 | --- | --- |
@@ -269,9 +270,9 @@ bash x86/scripts/check-network.sh
 | `/dev/kvm` 不存在 | CPU 虚拟化、远程虚拟机嵌套虚拟化及 KVM 模块 |
 | `already exists` | 已有同名 AVD；先确认数据，不要覆盖 |
 | `adb` 无设备或 `offline` | 等待完整开机，确认 AVD 端口及 `adb devices -l` |
-| `su` 找不到 | 等待开机，用本版本 `start.sh` 启动 AVD，再重新运行模块安装脚本 |
+| `su` 找不到 | 等待开机，用本版本 `start-x11.sh` 启动 AVD，再重新运行模块安装脚本 |
 | 网络部分可用 | 检查 Wi-Fi、IP、DNS、代理及 Google 服务各自的 HTTPS 测试 |
-| 右侧栏点不动或无法复制粘贴 | 当前 WSLg 窗口方案已知问题，尚未解决 |
+| 右侧栏点不动或无法复制粘贴 | 确认使用 `start-x11.sh`；检查 X 显示端口及 WSL 到 Windows 显示服务的网络连接 |
 | 检查脚本全绿但没有认证结果 | 结构检查不是服务端判定；需要实际触发 Play Integrity 请求并查看结果 |
 
 如需反馈错误，提供：执行步骤、报错文字、发行版和磁盘空间信息。不要提供密码、keybox 内容、认证令牌或包含隐私的完整日志。

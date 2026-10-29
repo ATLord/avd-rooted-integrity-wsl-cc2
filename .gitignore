@@ -32,6 +32,7 @@ x86/out/
 x86/cache/
 x86/keybox.xml
 x86/downloads/
+x86/xserver/
 __pycache__/
 *.pyc
 /.ccache/
