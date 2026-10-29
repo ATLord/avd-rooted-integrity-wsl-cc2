@@ -2,7 +2,7 @@
 
 本项目是在 Windows x86-64 电脑上，通过 WSL2 Ubuntu 构建并运行 Root Android 模拟器的实验方案。它基于上游 [AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity) 的提交 `2b9e1051cc6903522f0397b240d40c1c09f744a4`，针对 x86-64 系统镜像和内核进行了适配。上游英文说明保留在 [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)；上游的 ARM64 使用方法及完整性结果不能直接视为本项目的结果。
 
-> **请先阅读：** 本项目仅支持通过 WSL2 运行，尚非一键安装。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。本机曾验证 Android 和自动 ADB Shell Root，新仓库尚未在干净电脑上完成全流程复现。
+> **请先阅读：** 本项目仅支持通过 WSL2 运行，尚非一键安装。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。已在同一台电脑的全新 Ubuntu 22.04 实例中测试构建、启动、自动 ADB Shell Root、模块和 XML 配置；尚未在另一台干净电脑上验证。
 
 独立仓库：[avd-rooted-integrity-windows-autoroot](https://github.com/ATLord/avd-rooted-integrity-windows-autoroot)（私有仓库，需获得访问权限）。仓库名称保留原样，实际使用方式为 Windows 上的 WSL2 Ubuntu。
 
@@ -28,7 +28,7 @@
 
 ## 当前结果和限制
 
-- Android 启动、KVM、ADB Root、ReZygisk 和 TEESimulator 进程已在本机验证；项目的结构检查通过。
+- 在本机独立的全新 Ubuntu 实例中，从仓库克隆、安装 SDK revision 7、编译内核、启动 Android、自动 ADB Root、安装模块及配置 XML 已验证；Android 重启后 Root、XML 和 VirtWifi 自动连接也已检查。模块下载使用了针对本机网络临时配置的代理，其他网络环境需自行确认。
 - 没有验证本 WSL 版本在新电脑上的 Play Integrity 判定。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
 - 原 SUSFS 模块的 `ksu_susfs` 是 ARM64 原生可执行文件，在 x86_64 系统中执行失败；不能假设 SUSFS 用户空间功能完整。
 - WSLg 中模拟器右侧栏可能无法点击，Windows 与模拟器的复制粘贴也可能异常，目前尚未在 WSL 方案中解决。
@@ -42,7 +42,7 @@
 | --- | --- |
 | 电脑与虚拟化 | Windows x86-64；CPU 虚拟化已开启。若 Windows 本身运行在虚拟机中，还需要宿主机提供嵌套虚拟化。 |
 | WSL | WSL2、Ubuntu 22.04、可用的 `/dev/kvm` 和 WSLg 图形支持。模拟器运行在 WSL 中。 |
-| 构建工具 | Windows 上安装 Git 和使用 Linux 引擎的 Docker Desktop；Ubuntu 中安装 Java 17、curl、unzip、git、python3。 |
+| 构建与图形依赖 | Windows 上安装 Git 和使用 Linux 引擎的 Docker Desktop；Ubuntu 中安装 Java 17、curl、unzip、git、python3 和模拟器的音频/X11 库（见下方命令）。 |
 | 空间 | 首次内核构建前，Docker 数据盘至少留出 20 GB；Ubuntu、SDK、模拟器数据和项目还需要额外空间。项目放在 F 盘不代表 Docker 不占 C 盘。 |
 | 网络 | 需要能访问 GitHub、Google Android SDK 和项目使用的源码、模块发布源；Google Play 服务连通性也要单独检查。 |
 | XML | 自行准备有权使用的 `keybox.xml`；仓库不会提供真实文件。 |
@@ -74,7 +74,7 @@
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-17-jre-headless curl unzip git python3
+sudo apt install -y openjdk-17-jre-headless curl unzip git python3 libpulse0 libxi6 libxkbfile1 libsm6 libice6
 ```
 
 以下 WSL 命令假设项目位于 `F:\test\avd-rooted-integrity-autoroot`；换目录时请相应修改路径。
@@ -119,7 +119,7 @@ bash x86/scripts/doctor.sh
 bash x86/scripts/start.sh
 ```
 
-创建脚本拒绝覆盖同名 AVD；如已有 AVD，请先确认它确实是需要使用的设备。启动脚本使用端口 5554、不加载快照和上述自定义内核，并在开机后尝试连接 `VirtWifi`；图形界面依赖 WSLg。请在安装或重启前先同步模拟器数据，避免强制结束导致写入丢失。
+创建脚本拒绝覆盖同名 AVD；如已有 AVD，请先确认它确实是需要使用的设备。启动脚本使用端口 5554、不加载快照和上述自定义内核，并在首次开机及 Android 重启后尝试连接 `VirtWifi`；图形界面依赖 WSLg。请在安装或重启前先同步模拟器数据，避免强制结束导致写入丢失。
 
 ## 模块和项目配置
 
@@ -157,7 +157,7 @@ bash x86/scripts/doctor.sh
 bash x86/scripts/start.sh
 ```
 
-`start.sh` 默认使用端口 5554。窗口启动后保持该终端运行；它会尝试在设备开机后连接 `VirtWifi`，但 Wi-Fi 自动连接并非每次都已验证成功。可在另一个 Ubuntu 终端运行 `bash x86/scripts/check-network.sh` 检查联网情况。关闭前在 Android 系统中保存工作；需要重启设备时优先使用 Android 内的重启或上面的 `adb reboot`，以避免未完成的写入丢失。
+`start.sh` 默认使用端口 5554。窗口启动后保持该终端运行；它会尝试在设备首次开机及 Android 重启后连接 `VirtWifi`，本机已验证连接，其他机器的连接仍取决于系统和网络状态。可在另一个 Ubuntu 终端运行 `bash x86/scripts/check-network.sh` 检查联网情况。关闭前在 Android 系统中保存工作；需要重启设备时优先使用 Android 内的重启或上面的 `adb reboot`，以避免未完成的写入丢失。
 
 ## 常见问题
 

@@ -22,8 +22,17 @@ New-Item -ItemType Directory -Force -Path $CacheDir | Out-Null
 if (-not (Test-Path (Join-Path $SusfsRepo 'HEAD'))) {
     Invoke-Checked git @('init', '--bare', $SusfsRepo)
 }
-& git -C $SusfsRepo cat-file -e "$SusfsCommit^{commit}" 2>$null
-if ($LASTEXITCODE -ne 0) {
+$PreviousErrorActionPreference = $ErrorActionPreference
+try {
+    # A fresh cache does not contain the commit yet. Windows PowerShell 5.1
+    # treats redirected native stderr as an error when Stop is in effect.
+    $ErrorActionPreference = 'Continue'
+    & git -C $SusfsRepo cat-file -e "$SusfsCommit^{commit}" 2>$null
+    $HasSusfsCommit = ($LASTEXITCODE -eq 0)
+} finally {
+    $ErrorActionPreference = $PreviousErrorActionPreference
+}
+if (-not $HasSusfsCommit) {
     Invoke-Checked git @('-C', $SusfsRepo, 'fetch', '--depth=1', 'https://gitlab.com/simonpunk/susfs4ksu.git', $SusfsCommit)
 }
 Invoke-Checked git @('-C', $SusfsRepo, 'update-ref', 'refs/heads/pinned', $SusfsCommit)

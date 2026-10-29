@@ -1,6 +1,6 @@
 # Windows x86-64 模拟器从零安装操作手册
 
-> 本手册适用于 Windows 上通过 WSL2 Ubuntu 运行的模拟器。当前版本尚未在一台干净电脑上完成从零复现；测试结果和已知局限请先看首页 README。
+> 本手册适用于 Windows 上通过 WSL2 Ubuntu 运行的模拟器。已在现有电脑的新 Ubuntu 实例中测试构建、启动、Root、模块和 XML；尚未在另一台干净电脑上完成复现，测试结果和已知局限请先看首页 README。
 
 本手册面向第一次在 Windows 电脑上部署本项目的使用者。按顺序执行，每一阶段先检查结果，再继续下一阶段。它也适用于通过远程桌面操作的 Windows 电脑：**所有安装命令都要在目标电脑上运行**。
 
@@ -95,6 +95,8 @@ Get-PSDrive -PSProvider FileSystem |
    `git --version` 应显示版本；`docker version` 要能看到 **Server**，仅有 Client 不代表 Docker 引擎可用。`docker info` 如果报引擎不可连接，请先启动 Docker Desktop，等待启动完成后重试。
 4. 如果 Docker 无法拉取基础镜像或 GitHub/GitLab 无法连接，先处理目标机器的网络或 DNS；不要把连接失败当成代码编译错误。
 
+   Windows、WSL、Docker 容器和 Android 模拟器使用不同的网络环境。Windows 浏览器能连接不代表 WSL 或模拟器一定能连接；如使用代理，需要确认相应环境能够访问代理地址。特别是 WSL 的 NAT 环境无法直接使用 Windows 仅监听在 `127.0.0.1` 的代理，本机从零测试需要额外的代理转发才能下载部分模块。代理地址和端口因电脑而异，不要直接照搬其他机器的值。
+
 ## 3. 准备本版本的项目文件
 
 获得该私有仓库的访问权限，然后在 **Windows PowerShell** 克隆到目标电脑。例如：
@@ -115,7 +117,7 @@ dir
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-17-jre-headless curl unzip git python3
+sudo apt install -y openjdk-17-jre-headless curl unzip git python3 libpulse0 libxi6 libxkbfile1 libsm6 libice6
 java -version
 cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
 bash x86/scripts/install-sdk.sh
