@@ -24,10 +24,16 @@ if [[ "${1:-}" == '--download-only' ]]; then
 fi
 [[ "$("$adb" -s "$serial" emu avd name | tr -d '\r' | head -1)" = "${AVD_NAME:-Pixel_9_Pro_XL_x86}" ]] || { echo 'Unexpected AVD; refusing to install.' >&2; exit 1; }
 "$adb" -s "$serial" install -r "$downloads/KernelSU.apk"
-if ! "$adb" -s "$serial" shell su -c id | grep -q 'uid=0'; then
-  echo 'Open KernelSU-Next, go to Superuser > Shell, enable Superuser, then rerun this command.' >&2
-  exit 2
+"$adb" -s "$serial" shell am start -n com.rifsxd.ksunext/.ui.MainActivity >/dev/null
+for ((attempt=0; attempt<30; attempt++)); do
+  if "$adb" -s "$serial" shell su -c id 2>/dev/null | grep -q 'uid=0'; then break; fi
+  sleep 1
+done
+if ! "$adb" -s "$serial" shell su -c id 2>/dev/null | grep -q 'uid=0'; then
+  echo 'ADB Shell 自动 Root 未成功：请用本版本的 start.sh 启动已编译内核后重试。' >&2
+  exit 1
 fi
+echo 'ADB Shell Root 已自动启用。'
 for name in susfs rezygisk pif tee; do
   "$adb" -s "$serial" push "$downloads/$name.zip" "/data/local/tmp/avd-$name.zip"
   "$adb" -s "$serial" shell "su -c '/data/adb/ksu/bin/ksud module install /data/local/tmp/avd-$name.zip'"

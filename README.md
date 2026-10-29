@@ -1,10 +1,28 @@
-# Windows x86-64 Android 模拟器：中文使用说明
+# Windows x86-64 Android 模拟器：自动 Root 版
 
 本项目是在 Windows x86-64 电脑上，通过 WSL2 Ubuntu 构建并运行 Root Android 模拟器的实验方案。它基于上游 [AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity) 的提交 `2b9e1051cc6903522f0397b240d40c1c09f744a4`，针对 x86-64 系统镜像和内核进行了适配。上游英文说明保留在 [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)；上游的 ARM64 使用方法及完整性结果不能直接视为本项目的结果。
 
-> **请先阅读：** 本项目目前不是一键开箱即用。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。模拟器与 Root 已验证，实际 Play Integrity 判定尚未验证。
+> **请先阅读：** 本项目目前不是一键开箱即用。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。模拟器与 Root 已验证；本机用户报告基础测试通过，其他 Play Integrity 级别尚未验证。
+
+独立仓库：[avd-rooted-integrity-windows-autoroot](https://github.com/ATLord/avd-rooted-integrity-windows-autoroot)（私有仓库，需获得访问权限）。Windows 原生版从零安装流程尚未完成；下面的完整安装手册目前面向 WSL 版。
+
+本版本在启动测试 AVD 时启用 KernelSU 的 `allow_shell` 参数，并由模块安装脚本自动启动管理器并取得 ADB Shell Root，无需在管理器中手动授权。此设置授予 ADB Shell Root；不自动授予普通应用 Root。请仅用于自己的测试 AVD。
+
+本机工作副本位于 `F:\test\AVD_Rooted_Integrity_autoroot`。如果原版模拟器已经打开，先正常关闭它，再从本版本运行 `start.sh`；仅在 Android 内重启无法给已经运行的模拟器追加新的启动参数。
 
 首次安装建议阅读 **[从零安装操作手册（详细版）](docs/INSTALLATION.zh-CN.md)**，其中区分了 Windows PowerShell 和 Ubuntu 命令，并给出每步检查方法及常见错误处理。
+
+配置 XML 请阅读 **[keybox.xml 配置教程](docs/KEYBOX.zh-CN.md)**。项目不会提供或自动生成有效 keybox。
+
+### 本机 Windows 原生窗口
+
+在这台电脑上，双击项目目录中的 `启动Windows模拟器.cmd` 可启动 Windows 原生窗口。也可以在 PowerShell 中运行 `powershell -ExecutionPolicy Bypass -File .\x86\start-windows.ps1`。模拟器运行时请保留启动窗口，正常关闭模拟器窗口即可退出。
+
+这个启动方式使用与项目目录同级的 `avd-windows-runtime` 文件夹，其中包含 Windows 模拟器、SDK 和设备数据；该文件夹是本机单独准备的，并不随 Git 仓库提供。路径不同可通过 `-RuntimeHome` 指定。Windows 设备是从 WSL 设备复制出来的独立副本，此后两个副本的数据不会自动同步。迁移后已检查 KernelSU、已安装模块、keybox 文件以及重新启动后的 Root 状态；keybox 是否有效和 Play Integrity 结果仍需另外验证。原 WSL 设备保留为备份。运行目录包含设备数据、ADB 密钥和使用者配置的 keybox，不要上传或分享该目录。
+
+本机测试时，Play Integrity 曾因无法连接 Google 返回网络错误 `-3`。Windows 已有本地 HTTP 代理，因此在 Windows 模拟器内设置了 Android 系统代理 `10.0.2.2:10808`；用户重试后报告基础测试通过。这一地址和端口仅对应本机配置，不适用于其他电脑，也要求 Windows 上的代理保持运行。Android 系统代理由各应用自行使用，不能保证所有流量都通过代理。如果代理端口改变或关闭，需要相应更新或移除模拟器内的代理设置。
+
+TB Checker 曾将 GSF ID 显示为 `Not Found`。本机检查发现 Google Play 服务的登记配置中存在非零 ID；但 TB Checker 未能显示的具体原因尚未确定，不能仅凭该提示判断设备未注册，也不能将存在 ID 等同于 Play Integrity 通过。
 
 ## 目录
 
@@ -21,9 +39,9 @@
 ## 当前结果和限制
 
 - Android 启动、KVM、ADB Root、ReZygisk 和 TEESimulator 进程已在本机验证；项目的结构检查通过。
-- **没有取得实际的 Play Integrity 判定**。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
+- 用户报告代理修复后基础测试通过；设备和强完整性结果尚未验证。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
 - 原 SUSFS 模块的 `ksu_susfs` 是 ARM64 原生可执行文件，在 x86_64 系统中执行失败；不能假设 SUSFS 用户空间功能完整。
-- WSLg 中模拟器右侧栏可能无法点击，Windows 与模拟器的复制粘贴也未解决。Windows 原生窗口方案尚未实现。
+- WSLg 中模拟器右侧栏可能无法点击，Windows 与模拟器的复制粘贴也可能异常。本机改用 Windows 原生模拟器窗口后，用户已在独立测试设备上确认右侧栏及双向文本复制粘贴正常。该方案目前依赖本机单独准备的 Windows 运行环境，尚未集成到从零安装流程。
 - 网络必须分别验证；当前环境曾能访问百度和 Google 连通性检测地址，但 Google 主站及认证状态接口连接失败。
 - 项目脚本按上游要求在模拟器内将 keybox 设为 **0644**，同一设备上的其他进程可能读取其中的私钥。只在隔离的测试设备中使用；不要提交、分享或在聊天中粘贴 keybox。
 - 不提供 keybox，也没有确认它是否有效或被撤销。不要在运行中的生产设备或其他用户 AVD 上运行安装脚本。
@@ -39,16 +57,7 @@
 1. 在 Windows 设置或固件中确认硬件虚拟化可用。按照 [微软 WSL 安装说明](https://learn.microsoft.com/windows/wsl/install) 安装 WSL2 和 Ubuntu 22.04；例如在管理员 PowerShell 中运行 `wsl --install -d Ubuntu-22.04`，如系统提示请重启，首次启动 Ubuntu 时创建 Linux 用户。用 `wsl -l -v` 检查发行版版本为 2。
 2. 安装并启动 [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/)，启用 Linux/WSL2 引擎；确保 `docker info` 可用。首次创建编译镜像可能需要下载几 GB。
 3. 安装 [Git for Windows](https://git-scm.com/install/windows)，在 PowerShell 中确认 `git --version` 可用。
-4. 在 GitHub 获得此私有仓库的访问权限，然后克隆。拥有私有仓库链接并不自动意味着有访问权限：
-
-   ```powershell
-   New-Item -ItemType Directory -Force F:\test | Out-Null
-   cd F:\test
-   git clone https://github.com/ATLord/avd-rooted-integrity-x86.git
-   cd avd-rooted-integrity-x86
-   ```
-
-   这里 `F:\test` 只是示例，可选择自己的工作目录；克隆时根据 GitHub 提示完成认证。若项目位于 F 盘，Ubuntu 中的对应路径通常以 `/mnt/f/` 开头。
+4. 从独立的自动 Root 仓库获取项目文件，放在自己的工作目录；原来的 GitHub 仓库不包含本版本的修改。以下以 `F:\test\avd-rooted-integrity-autoroot` 为示例；如果你的实际路径不同，请替换后续命令中的路径。
 
 ### 2. 安装 Ubuntu 依赖与 Android SDK
 
@@ -59,10 +68,10 @@ sudo apt update
 sudo apt install -y openjdk-17-jre-headless curl unzip git
 ```
 
-以下 WSL 命令假设项目克隆到 `F:\test\avd-rooted-integrity-x86`；换目录时请相应修改路径。
+以下 WSL 命令假设项目位于 `F:\test\avd-rooted-integrity-autoroot`；换目录时请相应修改路径。
 
 ```bash
-cd /mnt/f/test/avd-rooted-integrity-x86
+cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/install-sdk.sh
 ```
 
@@ -86,7 +95,7 @@ sudo chmod 660 /dev/kvm
 在 Windows PowerShell 中：
 
 ```powershell
-cd F:\test\avd-rooted-integrity-x86
+cd F:\test\avd-rooted-integrity-autoroot
 .\x86\build.ps1
 ```
 
@@ -95,7 +104,7 @@ cd F:\test\avd-rooted-integrity-x86
 在 WSL 中：
 
 ```bash
-cd /mnt/f/test/avd-rooted-integrity-x86
+cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/create-avd.sh
 bash x86/scripts/doctor.sh
 bash x86/scripts/start.sh
@@ -108,11 +117,11 @@ bash x86/scripts/start.sh
 模拟器正常开机后，在另一个 WSL 终端运行：
 
 ```bash
-cd /mnt/f/test/avd-rooted-integrity-x86
+cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/install-modules.sh
 ```
 
-脚本从项目列出的第三方版本下载文件并核对本次已验证的 SHA-256。它先安装 KernelSU 管理器；如果 Shell 还没有 Root，打开管理器，在 **Superuser → Shell** 启用 Superuser，然后重跑命令。模块安装后重启 Android，等待完全开机。
+脚本从项目列出的第三方版本下载文件并核对 SHA-256，自动安装并启动 KernelSU 管理器，确认 ADB Shell Root 后安装模块。不需要手动进入管理器授权。必须使用本版本的 `start.sh` 启动测试 AVD，才能启用自动授权。模块安装后重启 Android，等待完全开机。
 
 将自己的 keybox 保存到安全的本机位置，然后：
 
@@ -125,7 +134,7 @@ bash x86/scripts/check-device.sh
 bash x86/scripts/check-network.sh
 ```
 
-配置脚本直接读取你指定的 keybox，并把它写入模拟器；不会把它复制到项目目录，原始文件也不会被删除。模拟器内的 keybox 不会随本项目版本库分发。请勿把真实 keybox 放进 Docker 构建上下文或提交到 Git。
+配置脚本直接读取你指定的 keybox，并把它写入模拟器；不会把它复制到项目目录，原始文件也不会被删除。Windows 路径与 Ubuntu 路径的对应关系、文件准备及验证步骤详见 [keybox.xml 配置教程](docs/KEYBOX.zh-CN.md)。模拟器内的 keybox 不会随本项目版本库分发。
 
 安装模块、配置脚本和实际 Play Integrity 检查会改动测试 AVD；本项目仅针对指定测试 AVD。`check-device.sh` 输出的上游检查可能以零退出码报告失败，需要查看每项结果；它不会生成 Google 的认证判定，也不会证明 keybox 有效。
 
@@ -134,7 +143,7 @@ bash x86/scripts/check-network.sh
 以后使用时，先确保 Docker 不用于构建也可以正常启动模拟器；但 WSL/KVM 必须可用。打开 Ubuntu，进入项目目录：
 
 ```bash
-cd /mnt/f/test/avd-rooted-integrity-x86
+cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/doctor.sh
 bash x86/scripts/start.sh
 ```

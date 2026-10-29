@@ -1,8 +1,10 @@
 # Windows x86-64 模拟器从零安装操作手册
 
+> 本手册仅覆盖 WSL 图形窗口方案。Windows 原生窗口目前只有针对已准备好本机运行目录的启动脚本，尚未提供新电脑从零安装、创建 Windows AVD 和安装模块的完整流程。不要将本手册中的 WSL ADB 命令直接用于 Windows 原生 AVD。当前版本的测试结果和局限请先看首页 README。
+
 本手册面向第一次在 Windows 电脑上部署本项目的使用者。按顺序执行，每一阶段先检查结果，再继续下一阶段。它也适用于通过远程桌面操作的 Windows 电脑：**所有安装命令都要在目标电脑上运行**。
 
-项目地址：<https://github.com/ATLord/avd-rooted-integrity-x86>。本仓库为私有仓库，克隆前需要获得仓库所有者授权并完成 GitHub 登录。
+这是原 GitHub 项目的独立自动 Root 版本，发布在独立仓库，不会改变原仓库。不要从旧仓库克隆后假定其中已包含自动 Root 修改。
 
 > 项目目前属于实验性 x86-64 移植：模拟器启动、Root 和部分模块结构已在一台机器验证；并没有验证通过 Google Play Integrity。SUSFS 的 ARM64 用户空间工具不能直接在 x86-64 上运行。Windows/WSLg 中右侧工具栏、剪贴板和 Wi-Fi 自动连接仍可能有问题。
 
@@ -21,8 +23,8 @@
 
 ### 自动和手动部分
 
-- 手动：安装 WSL、Docker Desktop、Git、Java；启用虚拟化/KVM；审阅 Android SDK 许可；在 KernelSU 中授权 Shell；准备自己的 keybox。
-- 脚本完成：下载 Android SDK、编译内核、创建 AVD、下载并校验模块、写入项目配置、运行检查。
+- 手动：安装 WSL、Docker Desktop、Git、Java；启用虚拟化/KVM；审阅 Android SDK 许可；准备自己的 keybox。
+- 脚本完成：下载 Android SDK、编译内核、创建 AVD、自动启用 ADB Shell Root、下载并校验模块、写入项目配置、运行检查。必须使用本版本 `start.sh` 启动才能启用自动 Root。
 - 密钥：本仓库不包含真实 keybox。不要在聊天、截图或 GitHub 中发送私钥。配置脚本按上游要求把设备里的 keybox 设为 0644，同一设备上的其他进程可能读取它；只在隔离的测试设备中使用。
 
 ### 空间规划
@@ -93,19 +95,16 @@ Get-PSDrive -PSProvider FileSystem |
    `git --version` 应显示版本；`docker version` 要能看到 **Server**，仅有 Client 不代表 Docker 引擎可用。`docker info` 如果报引擎不可连接，请先启动 Docker Desktop，等待启动完成后重试。
 4. 如果 Docker 无法拉取基础镜像或 GitHub/GitLab 无法连接，先处理目标机器的网络或 DNS；不要把连接失败当成代码编译错误。
 
-## 3. 下载私有仓库
+## 3. 准备本版本的项目文件
 
-使用已获得该仓库访问权限的 GitHub 账号，在 **Windows PowerShell** 运行：
+将本自动 Root 版本项目文件放在目标电脑，例如 `C:\avd-work\avd-rooted-integrity-autoroot`。在 **Windows PowerShell** 检查：
 
 ```powershell
-New-Item -ItemType Directory -Force C:\avd-work | Out-Null
-cd C:\avd-work
-git clone https://github.com/ATLord/avd-rooted-integrity-x86.git
-cd C:\avd-work\avd-rooted-integrity-x86
+cd C:\avd-work\avd-rooted-integrity-autoroot
 dir
 ```
 
-应能看到 `README.md`、`x86`、`kernel-build`、`device` 等目录。`C:\avd-work` 只是示例，可改用空间充足的其他盘；后文的 `/mnt/c/avd-work/...` 也要相应调整。如果 GitHub 返回 404 或权限错误，先确认使用的账号已经被授予私有仓库访问权。仓库不提供真实 keybox，也不会包含编译好的内核或模块安装包。
+应能看到 `README.md`、`x86`、`kernel-build`、`device` 等目录。`C:\avd-work` 只是示例，可改用空间充足的其他盘；后文的 `/mnt/c/avd-work/...` 也要相应调整。真实 keybox 不随项目提供；重新分发源码时，编译好的内核和安装包默认被 Git 忽略，需要重新构建和下载。
 
 ## 4. 安装 Ubuntu 依赖与 Android SDK
 
@@ -115,7 +114,7 @@ dir
 sudo apt update
 sudo apt install -y openjdk-17-jre-headless curl unzip git
 java -version
-cd /mnt/c/avd-work/avd-rooted-integrity-x86
+cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
 bash x86/scripts/install-sdk.sh
 ```
 
@@ -159,7 +158,7 @@ ls -l /dev/kvm
 在 **Windows PowerShell**，而不是 Ubuntu 终端：
 
 ```powershell
-cd C:\avd-work\avd-rooted-integrity-x86
+cd C:\avd-work\avd-rooted-integrity-autoroot
 .\x86\build.ps1
 ```
 
@@ -177,13 +176,15 @@ Get-Item .\x86\out\bzImage-x86_64 | Select-Object FullName,Length
 在 **Ubuntu** 中：
 
 ```bash
-cd /mnt/c/avd-work/avd-rooted-integrity-x86
+cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
 bash x86/scripts/create-avd.sh
 bash x86/scripts/doctor.sh
 bash x86/scripts/start.sh
 ```
 
 `create-avd.sh` 拒绝覆盖已有同名 AVD；不要用强制覆盖处理不认识的现有设备。`doctor.sh` 会检查 SDK、内核文件和 KVM；如果出现 `FAIL`，先处理该项。`start.sh` 启动图形窗口并固定端口 5554；保持该终端运行，启动后另外打开一个 Ubuntu 终端进行后续操作。通过远程桌面时，WSLg 的图形窗口是否能显示取决于目标机器的 WSLg 环境。
+
+如果原版同名 AVD 已经在运行，先正常关闭模拟器，再运行本版本 `start.sh`。本版本在模拟器进程启动时添加 Shell 自动 Root 参数，只有在 Android 内执行 `adb reboot` 不会给旧的模拟器进程添加该参数。
 
 在另一个 **Ubuntu** 终端检查：
 
@@ -194,20 +195,16 @@ bash x86/scripts/start.sh
 
 预期看到 `emulator-5554 device`，且第二条命令输出 `1`。首次开机可能需要较长时间；`offline` 或空结果时等待并重试，不要立刻执行安装。
 
-## 8. 安装模块和授予 Root
+## 8. 自动 Root 和模块安装
 
 模拟器开机完成后，在另一个 **Ubuntu** 终端：
 
 ```bash
-cd /mnt/c/avd-work/avd-rooted-integrity-x86
+cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
 bash x86/scripts/install-modules.sh
 ```
 
-脚本会下载指定版本并校验 SHA-256，先安装 KernelSU 管理器。如果提示需要给 Shell 授权：
-
-1. 在模拟器中打开 KernelSU-Next。
-2. 选择 **Superuser → Shell**，启用 Superuser。
-3. 回到 Ubuntu 终端，重新运行 `bash x86/scripts/install-modules.sh`。
+脚本会下载指定版本并校验 SHA-256，自动安装并启动 KernelSU 管理器、检查 ADB Shell Root，然后安装模块；不需要手动授权 Shell。启动脚本启用的 KernelSU 参数只自动授权 ADB Shell，不自动授权普通应用。由于 Shell 具有 Root 权限，请仅在自己的测试 AVD 中使用。
 
 安装结束后，用模拟器内重启或在 **Ubuntu** 执行：
 
@@ -228,12 +225,12 @@ bash x86/scripts/install-modules.sh
 只对本项目的测试 AVD 操作。把自己有权使用的 keybox 保存在目标电脑的本地安全位置，例如 `C:\avd-private\keybox.xml`，然后在 **Ubuntu**：
 
 ```bash
-cd /mnt/c/avd-work/avd-rooted-integrity-x86
+cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
 bash x86/scripts/configure-device.sh /mnt/c/avd-private/keybox.xml
 "$HOME/Android/Sdk/platform-tools/adb" -s emulator-5554 reboot
 ```
 
-路径只是示例，必须替换成自己的实际路径。脚本直接读取该文件，不把真实 keybox 加入项目目录或 Git；但会将其写入测试模拟器。文件格式可参考 `device/data_adb/tricky_store/keybox.xml.example`，该示例不是有效密钥。仓库不会帮你获得 keybox，也不能证明它没有被撤销。
+路径只是示例，必须替换成自己的实际路径。具体的文件准备、Windows 与 Ubuntu 路径转换、验证命令和常见错误，参见 [keybox.xml 配置教程](KEYBOX.zh-CN.md)。脚本直接读取该文件，不把真实 keybox 加入项目目录或 Git；但会将其写入测试模拟器。文件格式可参考 `device/data_adb/tricky_store/keybox.xml.example`，该示例不是有效密钥。项目不会帮你获得 keybox，也不能证明它没有被撤销。
 
 **不要通过手动重启 keymint、keystore2 或 TEESimulator 来应用变更。** 按上游说明，使用完整重启；认证模式只能在实际触发认证请求后检查。
 
@@ -267,7 +264,7 @@ bash x86/scripts/check-network.sh
 | `/dev/kvm` 不存在 | CPU 虚拟化、远程虚拟机嵌套虚拟化及 KVM 模块 |
 | `already exists` | 已有同名 AVD；先确认数据，不要覆盖 |
 | `adb` 无设备或 `offline` | 等待完整开机，确认 AVD 端口及 `adb devices -l` |
-| `su` 找不到 | 先等开机，再在 KernelSU 中为 Shell 开启 Superuser |
+| `su` 找不到 | 等待开机，用本版本 `start.sh` 启动 AVD，再重新运行模块安装脚本 |
 | 网络部分可用 | 检查 Wi-Fi、IP、DNS、代理及 Google 服务各自的 HTTPS 测试 |
 | 右侧栏点不动或无法复制粘贴 | 当前 WSLg 窗口方案已知问题，尚未完成 Windows 原生窗口适配 |
 | 检查脚本全绿但没有认证结果 | 结构检查不是服务端判定；需要实际触发 Play Integrity 请求并查看结果 |

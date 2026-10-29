@@ -15,7 +15,8 @@ if "$ANDROID_SDK_ROOT/platform-tools/adb" -s emulator-5554 emu avd name 2>/dev/n
   exit 0
 fi
 "$ANDROID_SDK_ROOT/emulator/emulator" -avd "$avd" -port 5554 \
-  -kernel "$kernel" -no-snapshot -gpu swiftshader_indirect -accel on &
+  -kernel "$kernel" -no-snapshot -gpu swiftshader_indirect -accel on \
+  -qemu -append kernelsu.allow_shell=1 &
 emulator_pid=$!
 (
   adb="$ANDROID_SDK_ROOT/platform-tools/adb"
