@@ -4,6 +4,8 @@
 
 > **请先阅读：** 本项目目前不是一键开箱即用。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。模拟器与 Root 已验证，实际 Play Integrity 判定尚未验证。
 
+首次安装建议阅读 **[从零安装操作手册（详细版）](docs/INSTALLATION.zh-CN.md)**，其中区分了 Windows PowerShell 和 Ubuntu 命令，并给出每步检查方法及常见错误处理。
+
 ## 目录
 
 - [当前结果和限制](#当前结果和限制)
