@@ -2,27 +2,17 @@
 
 本项目是在 Windows x86-64 电脑上，通过 WSL2 Ubuntu 构建并运行 Root Android 模拟器的实验方案。它基于上游 [AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity) 的提交 `2b9e1051cc6903522f0397b240d40c1c09f744a4`，针对 x86-64 系统镜像和内核进行了适配。上游英文说明保留在 [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)；上游的 ARM64 使用方法及完整性结果不能直接视为本项目的结果。
 
-> **请先阅读：** 本项目目前不是一键开箱即用。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。模拟器与 Root 已验证；本机用户报告基础测试通过，其他 Play Integrity 级别尚未验证。
+> **请先阅读：** 本项目仅支持通过 WSL2 运行，尚非一键安装。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。本机曾验证 Android 和自动 ADB Shell Root，新仓库尚未在干净电脑上完成全流程复现。
 
-独立仓库：[avd-rooted-integrity-windows-autoroot](https://github.com/ATLord/avd-rooted-integrity-windows-autoroot)（私有仓库，需获得访问权限）。Windows 原生版从零安装流程尚未完成；下面的完整安装手册目前面向 WSL 版。
+独立仓库：[avd-rooted-integrity-windows-autoroot](https://github.com/ATLord/avd-rooted-integrity-windows-autoroot)（私有仓库，需获得访问权限）。仓库名称保留原样，实际使用方式为 Windows 上的 WSL2 Ubuntu。
 
 本版本在启动测试 AVD 时启用 KernelSU 的 `allow_shell` 参数，并由模块安装脚本自动启动管理器并取得 ADB Shell Root，无需在管理器中手动授权。此设置授予 ADB Shell Root；不自动授予普通应用 Root。请仅用于自己的测试 AVD。
 
-本机工作副本位于 `F:\test\AVD_Rooted_Integrity_autoroot`。如果原版模拟器已经打开，先正常关闭它，再从本版本运行 `start.sh`；仅在 Android 内重启无法给已经运行的模拟器追加新的启动参数。
+如果原版模拟器已经打开，先正常关闭它，再从本版本运行 `start.sh`；仅在 Android 内重启无法给已经运行的模拟器追加新的启动参数。
 
 首次安装建议阅读 **[从零安装操作手册（详细版）](docs/INSTALLATION.zh-CN.md)**，其中区分了 Windows PowerShell 和 Ubuntu 命令，并给出每步检查方法及常见错误处理。
 
 配置 XML 请阅读 **[keybox.xml 配置教程](docs/KEYBOX.zh-CN.md)**。项目不会提供或自动生成有效 keybox。
-
-### 本机 Windows 原生窗口
-
-在这台电脑上，双击项目目录中的 `启动Windows模拟器.cmd` 可启动 Windows 原生窗口。也可以在 PowerShell 中运行 `powershell -ExecutionPolicy Bypass -File .\x86\start-windows.ps1`。模拟器运行时请保留启动窗口，正常关闭模拟器窗口即可退出。
-
-这个启动方式使用与项目目录同级的 `avd-windows-runtime` 文件夹，其中包含 Windows 模拟器、SDK 和设备数据；该文件夹是本机单独准备的，并不随 Git 仓库提供。路径不同可通过 `-RuntimeHome` 指定。Windows 设备是从 WSL 设备复制出来的独立副本，此后两个副本的数据不会自动同步。迁移后已检查 KernelSU、已安装模块、keybox 文件以及重新启动后的 Root 状态；keybox 是否有效和 Play Integrity 结果仍需另外验证。原 WSL 设备保留为备份。运行目录包含设备数据、ADB 密钥和使用者配置的 keybox，不要上传或分享该目录。
-
-本机测试时，Play Integrity 曾因无法连接 Google 返回网络错误 `-3`。Windows 已有本地 HTTP 代理，因此在 Windows 模拟器内设置了 Android 系统代理 `10.0.2.2:10808`；用户重试后报告基础测试通过。这一地址和端口仅对应本机配置，不适用于其他电脑，也要求 Windows 上的代理保持运行。Android 系统代理由各应用自行使用，不能保证所有流量都通过代理。如果代理端口改变或关闭，需要相应更新或移除模拟器内的代理设置。
-
-TB Checker 曾将 GSF ID 显示为 `Not Found`。本机检查发现 Google Play 服务的登记配置中存在非零 ID；但 TB Checker 未能显示的具体原因尚未确定，不能仅凭该提示判断设备未注册，也不能将存在 ID 等同于 Play Integrity 通过。
 
 ## 目录
 
@@ -39,16 +29,26 @@ TB Checker 曾将 GSF ID 显示为 `Not Found`。本机检查发现 Google Play 
 ## 当前结果和限制
 
 - Android 启动、KVM、ADB Root、ReZygisk 和 TEESimulator 进程已在本机验证；项目的结构检查通过。
-- 用户报告代理修复后基础测试通过；设备和强完整性结果尚未验证。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
+- 没有验证本 WSL 版本在新电脑上的 Play Integrity 判定。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
 - 原 SUSFS 模块的 `ksu_susfs` 是 ARM64 原生可执行文件，在 x86_64 系统中执行失败；不能假设 SUSFS 用户空间功能完整。
-- WSLg 中模拟器右侧栏可能无法点击，Windows 与模拟器的复制粘贴也可能异常。本机改用 Windows 原生模拟器窗口后，用户已在独立测试设备上确认右侧栏及双向文本复制粘贴正常。该方案目前依赖本机单独准备的 Windows 运行环境，尚未集成到从零安装流程。
+- WSLg 中模拟器右侧栏可能无法点击，Windows 与模拟器的复制粘贴也可能异常，目前尚未在 WSL 方案中解决。
 - 网络必须分别验证；当前环境曾能访问百度和 Google 连通性检测地址，但 Google 主站及认证状态接口连接失败。
 - 项目脚本按上游要求在模拟器内将 keybox 设为 **0644**，同一设备上的其他进程可能读取其中的私钥。只在隔离的测试设备中使用；不要提交、分享或在聊天中粘贴 keybox。
 - 不提供 keybox，也没有确认它是否有效或被撤销。不要在运行中的生产设备或其他用户 AVD 上运行安装脚本。
 
 ## 准备环境
 
-需要 Windows x86-64、WSL2 Ubuntu 22.04、足够的磁盘空间（Docker 数据盘所在的磁盘首次构建至少预留 20 GB，项目所在盘也需要空间）、Docker Desktop 的 Linux 引擎、Windows Git、WSL 中 Java 17、curl、unzip。Docker 默认数据盘可能在 C 盘，即使项目在 F 盘也会消耗 C 盘。Docker 和 Git 需要访问源码上游。内核构建从 Windows PowerShell 执行；模拟器运行在 WSL。
+| 前置条件 | 说明 |
+| --- | --- |
+| 电脑与虚拟化 | Windows x86-64；CPU 虚拟化已开启。若 Windows 本身运行在虚拟机中，还需要宿主机提供嵌套虚拟化。 |
+| WSL | WSL2、Ubuntu 22.04、可用的 `/dev/kvm` 和 WSLg 图形支持。模拟器运行在 WSL 中。 |
+| 构建工具 | Windows 上安装 Git 和使用 Linux 引擎的 Docker Desktop；Ubuntu 中安装 Java 17、curl、unzip、git、python3。 |
+| 空间 | 首次内核构建前，Docker 数据盘至少留出 20 GB；Ubuntu、SDK、模拟器数据和项目还需要额外空间。项目放在 F 盘不代表 Docker 不占 C 盘。 |
+| 网络 | 需要能访问 GitHub、Google Android SDK 和项目使用的源码、模块发布源；Google Play 服务连通性也要单独检查。 |
+| XML | 自行准备有权使用的 `keybox.xml`；仓库不会提供真实文件。 |
+| 版本与权限 | 需要该私有仓库的访问权限；当前内核仅与 Android 36 Google Play x86_64 系统镜像 revision 7 验证过。 |
+
+内核构建命令在 Windows PowerShell 执行；SDK 安装、设备创建和启动命令在 Ubuntu 中执行。不同电脑的网络、虚拟化和镜像版本需要分别确认。
 
 ### 1. 安装 Windows 工具
 
@@ -57,7 +57,16 @@ TB Checker 曾将 GSF ID 显示为 `Not Found`。本机检查发现 Google Play 
 1. 在 Windows 设置或固件中确认硬件虚拟化可用。按照 [微软 WSL 安装说明](https://learn.microsoft.com/windows/wsl/install) 安装 WSL2 和 Ubuntu 22.04；例如在管理员 PowerShell 中运行 `wsl --install -d Ubuntu-22.04`，如系统提示请重启，首次启动 Ubuntu 时创建 Linux 用户。用 `wsl -l -v` 检查发行版版本为 2。
 2. 安装并启动 [Docker Desktop for Windows](https://docs.docker.com/desktop/setup/install/windows-install/)，启用 Linux/WSL2 引擎；确保 `docker info` 可用。首次创建编译镜像可能需要下载几 GB。
 3. 安装 [Git for Windows](https://git-scm.com/install/windows)，在 PowerShell 中确认 `git --version` 可用。
-4. 从独立的自动 Root 仓库获取项目文件，放在自己的工作目录；原来的 GitHub 仓库不包含本版本的修改。以下以 `F:\test\avd-rooted-integrity-autoroot` 为示例；如果你的实际路径不同，请替换后续命令中的路径。
+4. 获得私有仓库的访问权限，在 Windows PowerShell 克隆项目（以下目录是示例）：
+
+   ```powershell
+   New-Item -ItemType Directory -Force F:\test | Out-Null
+   cd F:\test
+   git clone https://github.com/ATLord/avd-rooted-integrity-windows-autoroot.git avd-rooted-integrity-autoroot
+   cd avd-rooted-integrity-autoroot
+   ```
+
+   原仓库不包含本版本的自动 Root 修改；如果使用其他目录，请替换后续命令中的路径。
 
 ### 2. 安装 Ubuntu 依赖与 Android SDK
 
@@ -65,7 +74,7 @@ TB Checker 曾将 GSF ID 显示为 `Not Found`。本机检查发现 Google Play 
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-17-jre-headless curl unzip git
+sudo apt install -y openjdk-17-jre-headless curl unzip git python3
 ```
 
 以下 WSL 命令假设项目位于 `F:\test\avd-rooted-integrity-autoroot`；换目录时请相应修改路径。

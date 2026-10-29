@@ -1,12 +1,12 @@
 # Windows x86-64 模拟器从零安装操作手册
 
-> 本手册仅覆盖 WSL 图形窗口方案。Windows 原生窗口目前只有针对已准备好本机运行目录的启动脚本，尚未提供新电脑从零安装、创建 Windows AVD 和安装模块的完整流程。不要将本手册中的 WSL ADB 命令直接用于 Windows 原生 AVD。当前版本的测试结果和局限请先看首页 README。
+> 本手册适用于 Windows 上通过 WSL2 Ubuntu 运行的模拟器。当前版本尚未在一台干净电脑上完成从零复现；测试结果和已知局限请先看首页 README。
 
 本手册面向第一次在 Windows 电脑上部署本项目的使用者。按顺序执行，每一阶段先检查结果，再继续下一阶段。它也适用于通过远程桌面操作的 Windows 电脑：**所有安装命令都要在目标电脑上运行**。
 
 这是原 GitHub 项目的独立自动 Root 版本，发布在独立仓库，不会改变原仓库。不要从旧仓库克隆后假定其中已包含自动 Root 修改。
 
-> 项目目前属于实验性 x86-64 移植：模拟器启动、Root 和部分模块结构已在一台机器验证；并没有验证通过 Google Play Integrity。SUSFS 的 ARM64 用户空间工具不能直接在 x86-64 上运行。Windows/WSLg 中右侧工具栏、剪贴板和 Wi-Fi 自动连接仍可能有问题。
+> 项目目前属于实验性 x86-64 移植：模拟器启动、Root 和部分模块结构已在一台机器验证；尚未验证本 WSL 版本在新电脑上的 Google Play Integrity 结果。SUSFS 的 ARM64 用户空间工具不能直接在 x86-64 上运行。WSLg 中右侧工具栏、剪贴板和 Wi-Fi 自动连接仍可能有问题。
 
 ## 0. 阅读前先知道
 
@@ -38,7 +38,7 @@ Get-PSDrive -PSProvider FileSystem |
   Select-Object Name,Root,@{Name='FreeGB';Expression={[math]::Round($_.Free/1GB,2)}}
 ```
 
-`build.ps1` 对能够识别的 Docker 默认数据盘要求至少 20 GB 可用空间；这只是**构建前检查阈值，不是整个项目的总空间保证**。SDK、系统镜像、Ubuntu、Docker 和模拟器数据也会占空间，建议为全部阶段留出明显高于 20 GB 的余量，并在 SDK 安装后、构建前再次检查。对话里曾出现的 41.38 GB 是当时远程电脑的历史读数，不代表现在仍有这么多空间。
+`build.ps1` 对能够识别的 Docker 默认数据盘要求至少 20 GB 可用空间；这只是**构建前检查阈值，不是整个项目的总空间保证**。SDK、系统镜像、Ubuntu、Docker 和模拟器数据也会占空间，建议为全部阶段留出明显高于 20 GB 的余量，并在 SDK 安装后、构建前再次检查。
 
 不要通过删除其他 Docker volume 或 `wsl --unregister` 来盲目腾空间。`wsl --unregister` 会永久删除指定发行版内部的数据；先确认内容并单独备份，再自行决定是否删除。
 
@@ -97,9 +97,12 @@ Get-PSDrive -PSProvider FileSystem |
 
 ## 3. 准备本版本的项目文件
 
-将本自动 Root 版本项目文件放在目标电脑，例如 `C:\avd-work\avd-rooted-integrity-autoroot`。在 **Windows PowerShell** 检查：
+获得该私有仓库的访问权限，然后在 **Windows PowerShell** 克隆到目标电脑。例如：
 
 ```powershell
+New-Item -ItemType Directory -Force C:\avd-work | Out-Null
+cd C:\avd-work
+git clone https://github.com/ATLord/avd-rooted-integrity-windows-autoroot.git avd-rooted-integrity-autoroot
 cd C:\avd-work\avd-rooted-integrity-autoroot
 dir
 ```
@@ -112,7 +115,7 @@ dir
 
 ```bash
 sudo apt update
-sudo apt install -y openjdk-17-jre-headless curl unzip git
+sudo apt install -y openjdk-17-jre-headless curl unzip git python3
 java -version
 cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
 bash x86/scripts/install-sdk.sh
@@ -266,7 +269,7 @@ bash x86/scripts/check-network.sh
 | `adb` 无设备或 `offline` | 等待完整开机，确认 AVD 端口及 `adb devices -l` |
 | `su` 找不到 | 等待开机，用本版本 `start.sh` 启动 AVD，再重新运行模块安装脚本 |
 | 网络部分可用 | 检查 Wi-Fi、IP、DNS、代理及 Google 服务各自的 HTTPS 测试 |
-| 右侧栏点不动或无法复制粘贴 | 当前 WSLg 窗口方案已知问题，尚未完成 Windows 原生窗口适配 |
+| 右侧栏点不动或无法复制粘贴 | 当前 WSLg 窗口方案已知问题，尚未解决 |
 | 检查脚本全绿但没有认证结果 | 结构检查不是服务端判定；需要实际触发 Play Integrity 请求并查看结果 |
 
 如需反馈错误，提供：执行步骤、报错文字、发行版和磁盘空间信息。不要提供密码、keybox 内容、认证令牌或包含隐私的完整日志。

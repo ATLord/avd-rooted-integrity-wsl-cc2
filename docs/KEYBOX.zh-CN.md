@@ -1,6 +1,6 @@
 # keybox.xml 配置教程
 
-> 本教程目前适用于 WSL 版 AVD 和 WSL ADB，尚未适配 Windows 原生 AVD。Windows 版新建设备及 keybox 配置流程尚待补齐，不要将下方命令直接用在 Windows 版设备上。
+> 本教程适用于本项目在 WSL2 中创建的 AVD，并使用 WSL 中的 ADB 操作。
 
 本文说明如何将自己已有的 `keybox.xml` 配置到本项目的测试模拟器。文件名是 **keybox.xml**，不是 `checkbox.xml`。项目不提供真实 keybox，也不会根据示例文件生成可用的硬件证明密钥。
 
