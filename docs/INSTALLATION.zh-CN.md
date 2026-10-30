@@ -1,6 +1,6 @@
 # Windows x86-64 模拟器从零安装操作手册
 
-> 本手册适用于 Windows 上通过 WSL2 Ubuntu 运行的模拟器。界面修复版在本机独立测试 AVD 中验证了侧栏和双向文本复制粘贴；尚未在另一台干净电脑上完成复现。
+> 本手册适用于 Windows 网络接管版：请克隆 `windows-network-integration` 分支。界面修复版在本机独立测试 AVD 中验证了侧栏和双向文本复制粘贴；尚未在另一台干净电脑上完成复现。网络配置及测试边界见 [Windows 网络接管说明](WINDOWS-NETWORK.zh-CN.md)。
 
 本手册面向第一次在 Windows 电脑上部署本项目的使用者。按顺序执行，每一阶段先检查结果，再继续下一阶段。它也适用于通过远程桌面操作的 Windows 电脑：**所有安装命令都要在目标电脑上运行**。
 
@@ -104,7 +104,7 @@ Get-PSDrive -PSProvider FileSystem |
 ```powershell
 New-Item -ItemType Directory -Force C:\avd-work | Out-Null
 cd C:\avd-work
-git clone https://github.com/ATLord/avd-rooted-integrity-wsl-ui.git avd-rooted-integrity-autoroot
+git clone --branch windows-network-integration https://github.com/ATLord/avd-rooted-integrity-wsl-ui.git avd-rooted-integrity-autoroot
 cd C:\avd-work\avd-rooted-integrity-autoroot
 dir
 ```

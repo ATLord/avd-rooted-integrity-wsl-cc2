@@ -1,6 +1,6 @@
-# WSL x86-64 Android 模拟器：界面修复版
+# WSL x86-64 Android 模拟器：Windows 网络接管版
 
-> **Windows 网络接管实验分支：** 此版本让模拟器使用 Windows 的网络路由和用户自行启用的 TUN/VPN，不自动配置 HTTP 代理或开启 VPN。配置、测试结果与限制参见 [Windows 网络接管说明](docs/WINDOWS-NETWORK.zh-CN.md)。原界面修复版保持不变。
+> **Windows 网络接管版：** 本分支包含完整项目。模拟器使用 Windows 的网络路由和用户自行启用的 TUN/VPN，不自动配置 HTTP 代理或开启 VPN。配置、测试结果与限制参见 [Windows 网络接管说明](docs/WINDOWS-NETWORK.zh-CN.md)。原界面修复版的 master 分支保持不变。
 
 本项目是在 Windows x86-64 电脑上，通过 WSL2 Ubuntu 构建并运行 Root Android 模拟器的实验方案。它基于上游 [AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity) 的提交 `2b9e1051cc6903522f0397b240d40c1c09f744a4`，针对 x86-64 系统镜像和内核进行了适配。上游英文说明保留在 [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)；上游的 ARM64 使用方法及完整性结果不能直接视为本项目的结果。
 
@@ -64,7 +64,7 @@
    ```powershell
    New-Item -ItemType Directory -Force F:\test | Out-Null
    cd F:\test
-   git clone https://github.com/ATLord/avd-rooted-integrity-wsl-ui.git avd-rooted-integrity-autoroot
+   git clone --branch windows-network-integration https://github.com/ATLord/avd-rooted-integrity-wsl-ui.git avd-rooted-integrity-autoroot
    cd avd-rooted-integrity-autoroot
    ```
 
