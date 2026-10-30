@@ -4,7 +4,7 @@
 
 本项目是在 Windows x86-64 电脑上，通过 WSL2 Ubuntu 构建并运行 Root Android 模拟器的实验方案。它基于上游 [AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity) 的提交 `2b9e1051cc6903522f0397b240d40c1c09f744a4`，针对 x86-64 系统镜像和内核进行了适配。上游英文说明保留在 [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)；上游的 ARM64 使用方法及完整性结果不能直接视为本项目的结果。
 
-> **请先阅读：** 本项目仅支持通过 WSL2 运行，尚非一键安装。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。已在同一台电脑的全新 Ubuntu 22.04 实例中测试构建、启动、自动 ADB Shell Root、模块和 XML 配置；尚未在另一台干净电脑上验证。
+> **请先阅读：** 本项目仅支持通过 WSL2 运行，尚非一键安装。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。2026-10-30 在本机新安装的 Ubuntu 22.04 中完成了部署与启动测试，但内核构建复用了已有 Docker 缓存。Google 账号登录和真实 Play Integrity 判定尚未验证成功，不能据此认定已在完全干净的电脑上完成全部功能验证。
 
 本仓库是 [WSL 自动 Root 版](https://github.com/ATLord/avd-rooted-integrity-windows-autoroot) 的独立界面修复版，不改变原仓库。模拟器、Android 系统和内核仍运行在 WSL；窗口通过 Windows 上的 VcXsrv 显示。
 
@@ -30,11 +30,13 @@
 
 ## 当前结果和限制
 
-- 在本机独立的全新 Ubuntu 实例中，从仓库克隆、安装 SDK revision 7、编译内核、启动 Android、自动 ADB Root、安装模块及配置 XML 已验证；Android 重启后 Root、XML 和 VirtWifi 自动连接也已检查。模块下载使用了针对本机网络临时配置的代理，其他网络环境需自行确认。
-- 没有验证本 WSL 版本在新电脑上的 Play Integrity 判定。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
-- 原 SUSFS 模块的 `ksu_susfs` 是 ARM64 原生可执行文件，在 x86_64 系统中执行失败；不能假设 SUSFS 用户空间功能完整。
-- 使用 `start-x11.sh` 启动的独立测试 AVD 中，用户已在本机确认右侧栏和 Windows↔Android 双向文本复制粘贴可用。其他电脑还需要自行验证；直接使用 `start.sh` 的 WSLg 窗口仍可能出现原问题。
-- 网络必须分别验证；当前环境曾能访问百度和 Google 连通性检测地址，但 Google 主站及认证状态接口连接失败。
+- 2026-10-30 本机测试基于本分支提交 `26016f0`：新安装 Ubuntu、克隆仓库、安装 SDK revision 7、构建内核、启动 Android、自动 ADB Shell Root、安装模块和配置 XML 均完成。配置后冷启动验证了 Root、XML 权限、TEESimulator 进程和 VirtWifi 连接；构建复用了已有 Docker 镜像层及源码/对象缓存，未验证无缓存完整构建。
+- 本次环境：Windows `10.0.26300.9711`、Intel Core Ultra 5 225H、WSL 2.7.8、Ubuntu 22.04.5、Docker 29.9.2、Java 17、Emulator 37.2.13.0、VcXsrv 21.1.16.1。KVM 加速自检通过。以上是测试版本记录，不保证其他组合兼容。
+- 网络必须分别验证。本次等待开机服务完成后，百度、Google 主站和认证状态接口返回 HTTP 200，Google 连通性检测返回 204；此前环境曾有部分 Google 地址访问失败。本次未切换测试 TUN 开关，不能证明所有流量均被 VPN 接管。
+- Google 添加账号曾显示 `Something went wrong`。Play 服务随后自动更新，重新进入登录流程后暂未复现原错误，但未确认账号登录成功；网站可访问不代表登录服务正常。
+- 本次运行完整性触发脚本后未捕获到 `integrity.api.key.alias` 请求活动，未取得真实 Play Integrity 服务端判定。结构检查通过、伪装属性一致或 TEESimulator 运行，都不等于 `MEETS_STRONG_INTEGRITY`。
+- 原 SUSFS 模块的 `ksu_susfs` 是 ARM64 原生可执行文件；本次在 x86_64 上复现 `unsupported e_shentsize` 错误。模块安装成功不代表 SUSFS 用户空间功能完整。
+- 较早的本机测试曾由用户确认右侧栏和 Windows↔Android 双向文本复制粘贴可用；本次只验证了 VcXsrv 启动，未重新验证这两项交互。直接使用 `start.sh` 的 WSLg 窗口仍可能出现原问题。
 - 项目脚本按上游要求在模拟器内将 keybox 设为 **0644**，同一设备上的其他进程可能读取其中的私钥。只在隔离的测试设备中使用；不要提交、分享或在聊天中粘贴 keybox。
 - 不提供 keybox，也没有确认它是否有效或被撤销。不要在运行中的生产设备或其他用户 AVD 上运行安装脚本。
 
@@ -72,6 +74,8 @@
 
 ### 2. 安装 Ubuntu 依赖与 Android SDK
 
+先进入 **Ubuntu-22.04**，不要在 Docker Desktop 自用的 `docker-desktop` 发行版中安装 SDK。SDK、AVD 和日常启动应使用同一个 Linux 用户，否则默认的 `$HOME/Android/Sdk` 和 `$HOME/.android` 会指向不同位置。若使用专用用户，在 Windows PowerShell 中执行 `wsl -d Ubuntu-22.04 -u <Linux用户名>`；不要照抄尖括号占位符。
+
 在 WSL 的 Ubuntu 中安装依赖（如果尚未安装）：
 
 ```bash
@@ -89,6 +93,13 @@ bash x86/scripts/install-xserver.sh
 
 SDK 安装脚本使用 Google 官方命令行工具并校验 SHA-256；许可协议由使用者在提示中自行阅读和接受。显示组件脚本下载 VcXsrv 官方版本并校验 SHA-256，解压到被 Git 忽略的 `x86/xserver/`。
 
+本次系统镜像压缩包约 1.92 GB，下载和解压需要时间。安装结束后再执行创建/诊断脚本，并确认镜像版本；不要跳过 revision 7 的兼容性检查：
+
+```bash
+grep '^Pkg.Revision=' "${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/system-images/android-36/google_apis_playstore/x86_64/source.properties"
+# 预期：Pkg.Revision=7
+```
+
 ### 3. 启用 KVM
 
 KVM 需要可用的嵌套虚拟化。在 Ubuntu 终端中运行（以下适用于 Intel 主机）：
@@ -101,6 +112,14 @@ sudo chmod 660 /dev/kvm
 ```
 
 退出并重新进入 Ubuntu 终端后组权限生效。AMD 主机需要根据实际环境使用 `kvm_amd`。这些 `/dev/kvm` 权限可能在 WSL 重启后需要重新设置；不要对不支持嵌套虚拟化的环境假定 KVM 可用。
+
+SDK 安装完成后，以运行模拟器的普通用户检查实际加速能力：
+
+```bash
+"${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/emulator/emulator" -accel-check
+```
+
+本次返回 `KVM (version 12) is installed and usable`；仅有 `/dev/kvm` 文件或可读写权限，还不足以证明加速可用。
 
 ## 构建和创建模拟器
 
@@ -133,15 +152,30 @@ cd /mnt/f/test/avd-rooted-integrity-autoroot
 bash x86/scripts/install-modules.sh
 ```
 
-脚本从项目列出的第三方版本下载文件并核对 SHA-256，自动安装并启动 KernelSU 管理器，确认 ADB Shell Root 后安装模块。不需要手动进入管理器授权。`start-x11.sh` 会调用本版本的 `start.sh` 启用自动授权。模块安装后重启 Android，等待完全开机。
+脚本从项目列出的第三方版本下载文件并核对 SHA-256，自动安装并启动 KernelSU 管理器，确认 ADB Shell Root 后安装模块，并安装 VirtWifi 开机服务。不需要手动进入管理器授权。`start-x11.sh` 会调用本版本的 `start.sh` 启用自动授权。可先运行 `bash x86/scripts/install-modules.sh --download-only` 单独验证下载；该选项不安装模块。
+
+**模块安装后先冷启动一次，待模块生效再配置 XML。** 本机曾在 `adb reboot` 后出现模拟器进程退出，日志包含 `stop: Not implemented`；根因未确认。可按以下方式关闭并重新启动指定测试 AVD：
+
+```bash
+"${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/platform-tools/adb" -s emulator-5554 emu kill
+# 等原模拟器窗口关闭、原 start-x11.sh 返回后，再在启动终端执行：
+bash x86/scripts/start-x11.sh
+```
+
+保持启动终端运行，在另一个同用户的 Ubuntu 终端继续操作。等待 `sys.boot_completed` 为 `1`，并在网络测试前确认 VirtWifi 已连接。
 
 将自己的 keybox 保存到安全的本机位置，然后：
 
 ```bash
 bash x86/scripts/configure-device.sh /mnt/f/keybox.xml
-# 使用模拟器内重启或下面的 adb 命令；不要重启 keymint、keystore2 或 TEESimulator 服务
-"$HOME/Android/Sdk/platform-tools/adb" -s emulator-5554 reboot
-# 等待 Android 完全启动后再检查
+```
+
+配置完成后，再按上面的关闭/启动步骤冷启动一次。不要单独重启 keymint、keystore2 或 TEESimulator 服务。随后在另一个 Ubuntu 终端检查：
+
+```bash
+"${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/platform-tools/adb" -s emulator-5554 shell getprop sys.boot_completed
+"${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/platform-tools/adb" -s emulator-5554 shell cmd wifi status
+# boot_completed=1 且显示连接到 VirtWifi 后，再检查：
 bash x86/scripts/check-device.sh
 bash x86/scripts/check-network.sh
 ```
@@ -152,7 +186,7 @@ bash x86/scripts/check-network.sh
 
 ## 日常启动、关闭和诊断
 
-以后使用时，先确保 Docker 不用于构建也可以正常启动模拟器；但 WSL/KVM 必须可用。打开 Ubuntu，进入项目目录：
+内核构建完成后，日常启动模拟器不需要运行 Docker 构建；WSL/KVM 必须可用。使用安装 SDK 和创建 AVD 时的 Linux 用户打开 Ubuntu，进入项目目录：
 
 ```bash
 cd /mnt/f/test/avd-rooted-integrity-autoroot
@@ -176,9 +210,63 @@ bash x86/scripts/start-x11.sh
 
 创建脚本不会覆盖已有的 `Pixel_9_Pro_XL_x86`。先确认该设备是否为本项目创建的测试设备，再决定继续使用或选择其他 AVD 名称。启动脚本固定使用端口 5554；安装和诊断脚本默认使用 `emulator-5554`。更改 `AVD_NAME` 或 `ANDROID_SERIAL` 后，需要确保目标一致。
 
-### Wi-Fi、Google 服务或剪贴板异常
+### 创建时提示 devices.xml 加载失败
 
-先运行 `bash x86/scripts/check-network.sh`。能访问某个网站不代表所有 Google 服务均可访问；DNS、代理和宿主机网络均可能影响结果。若 Wi-Fi 未自动连接，可在模拟器内打开 Wi-Fi 并选择 `VirtWifi`。如侧栏或剪贴板异常，确认是通过 `start-x11.sh` 启动，并检查 VcXsrv 与 WSL 的连接；不要关闭 Windows 防火墙来解决问题。
+本次 `avdmanager` 提示系统镜像目录下 `Could not load devices .../devices.xml`，但仍创建了 AVD。检查 `emulator -list-avds`、生成的 AVD `config.ini` 中的 `hw.device.name=pixel_9_pro_xl` 和镜像路径，再运行 `doctor.sh` 和启动测试；本次这些检查及实际启动通过。原因未确认，不能把此报错一概视为无害，也不要为消除提示随意创建空 XML。
+
+### powershell.exe 提示 Exec format error
+
+`start-x11.sh` 需要从 WSL 调用 Windows PowerShell。本次失败时 `/proc/sys/fs/binfmt_misc/WSLInterop` 注册项缺失。在 **Ubuntu 终端**先检查：
+
+```bash
+cat /proc/sys/fs/binfmt_misc/WSLInterop
+powershell.exe -NoProfile -Command 'Write-Output interop-ok'
+```
+
+仅当注册项缺失，且 `/proc/sys/fs/binfmt_misc/register` 已存在时，可尝试本次验证过的临时恢复：
+
+```bash
+if [ ! -e /proc/sys/fs/binfmt_misc/WSLInterop ] && [ -e /proc/sys/fs/binfmt_misc/register ]; then
+  printf ':WSLInterop:M::MZ::/init:PF\n' | sudo tee /proc/sys/fs/binfmt_misc/register >/dev/null
+fi
+powershell.exe -NoProfile -Command 'Write-Output interop-ok'
+```
+
+确认输出 `interop-ok` 后再启动。这只恢复当前会话的注册，不保证 WSL 重启后仍有效；若注册项已存在但调用仍失败，应继续排查 WSL 互操作配置，不能反复写入注册项。未验证此办法能处理所有 `Exec format error`。
+
+### 刚开机 Wi-Fi 关闭或网络不可达
+
+`sys.boot_completed=1` 不表示 Wi-Fi 已就绪。本次早期日志有 `Failed to create STA iface`；模块安装脚本部署的 `10-wlan0-virtwifi.sh` 会等开机完成后再等待 25 秒，创建 `wlan0` 并有界重试连接。等待服务完成后，本次自动连接成功。单独运行主机端 `start.sh` 的连接尝试不能替代设备端接口创建服务。
+
+先确认已安装模块并重启，再查看状态和开机服务日志（Ubuntu 终端）：
+
+```bash
+adb="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/platform-tools/adb"
+"$adb" -s emulator-5554 shell cmd wifi status
+"$adb" -s emulator-5554 shell "su -c 'tail -n 30 /data/adb/wlan0-setup.log'"
+```
+
+等待出现 `Wifi is connected to "VirtWifi"`。若重试结束仍失败，检查服务是否安装、日志中的接口创建错误及宿主机网络，而非无限等待或关闭防火墙。安装模块前，服务日志可能尚不存在。
+
+### HTTPS 检查返回 126 或网站访问结果不一致
+
+`check-network.sh` 的 HTTPS 探测依赖 ADB Shell Root 和 `/data/adb/ksu/bin/busybox`。本次模块安装前运行返回 126，不能解释为网站不可达。先确认 `su -c id` 返回 `uid=0`、BusyBox 存在且可执行，再运行网络检查；安装模块并完成开机服务后，本次四个 HTTPS 地址均成功。
+
+逐项阅读输出，脚本退出码 0 不代表所有探测通过。WSL 的“localhost 代理未映射到 NAT”警告也不直接证明断网；本次出现该警告时仍可下载。Windows 系统 HTTP 代理与 TUN 接管不同，应分别检查 Windows、WSL、Android 的连接情况，参见 [Windows 网络接管说明](docs/WINDOWS-NETWORK.zh-CN.md)。
+
+### Google 登录显示 Something went wrong
+
+本次前台为 Google Play 服务的 `auth.uiflows.addaccount.ErrorActivity`。当时 VirtWifi 和所测 Google 网址可用；Play 服务随后更新至 26.42.31，重新打开 Play 商店并点击 Sign in 后进入登录流程，短时观察未再出现原错误，但**未确认登录成功**。更新发生在错误之后，无法证明它是最初错误的原因或彻底解决办法。
+
+遇到此提示，先确认网络和 Play 服务更新状态，更新完成后重新进入登录流程并观察；若仍失败，检查该次登录的相关日志。不要仅凭通用错误页认定是 keybox、网络或 Play Integrity 问题。网址返回 200/204 不等于账号登录及设备认证通过，分享日志时请去除账号、令牌和密钥内容。
+
+### 完整性触发后仍没有请求记录
+
+本次 `verify-integrity.sh --trigger` 等待 30 秒后仍输出 `No integrity.api.key.alias activity captured`。这表示该检查没有捕获到目标活动，既不是通过结果，也不是明确的服务端拒绝；需要实际发起请求并查看服务端判定。该选项会清除测试 AVD 的 Play Store 数据、相关 DroidGuard 文件和 logcat，再启动 Play Store，不能作为日常只读诊断或保证有效的检测按钮。普通结构检查使用 `check-device.sh` 即可。
+
+### 侧栏或剪贴板异常
+
+确认通过 `start-x11.sh` 启动，并检查 VcXsrv 与 WSL 的连接及 X11 认证。按需允许对应显示服务的防火墙访问，不需要关闭 Windows 防火墙。本次未重新测试侧栏操作和双向剪贴板。
 
 ### SUSFS 报错或结构检查全绿
 
