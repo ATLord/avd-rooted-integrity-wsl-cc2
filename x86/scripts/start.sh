@@ -1,6 +1,8 @@
 #!/bin/bash
 set -eu
 export ANDROID_SDK_ROOT="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}"
+# Use Windows routing/TUN rather than inheriting a stale HTTP proxy from WSL.
+unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY ALL_PROXY all_proxy
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 kernel="${KERNEL:-$root/x86/out/bzImage-x86_64}"
 avd="${AVD_NAME:-Pixel_9_Pro_XL_x86}"

@@ -1,5 +1,7 @@
 # WSL x86-64 Android 模拟器：界面修复版
 
+> **Windows 网络接管实验分支：** 此版本让模拟器使用 Windows 的网络路由和用户自行启用的 TUN/VPN，不自动配置 HTTP 代理或开启 VPN。配置、测试结果与限制参见 [Windows 网络接管说明](docs/WINDOWS-NETWORK.zh-CN.md)。原界面修复版保持不变。
+
 本项目是在 Windows x86-64 电脑上，通过 WSL2 Ubuntu 构建并运行 Root Android 模拟器的实验方案。它基于上游 [AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity) 的提交 `2b9e1051cc6903522f0397b240d40c1c09f744a4`，针对 x86-64 系统镜像和内核进行了适配。上游英文说明保留在 [docs/UPSTREAM_README.md](docs/UPSTREAM_README.md)；上游的 ARM64 使用方法及完整性结果不能直接视为本项目的结果。
 
 > **请先阅读：** 本项目仅支持通过 WSL2 运行，尚非一键安装。WSL、Docker、Git、Java 和 KVM 需要人工准备；真实 keybox 需要使用者自行提供。已在同一台电脑的全新 Ubuntu 22.04 实例中测试构建、启动、自动 ADB Shell Root、模块和 XML 配置；尚未在另一台干净电脑上验证。

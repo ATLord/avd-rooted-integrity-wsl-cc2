@@ -6,6 +6,7 @@ trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/sdk/platform-tools" "$tmp/sdk/emulator" "$tmp/bin"
 touch "$tmp/kernel"
 export TEST_DIR="$tmp" ANDROID_SDK_ROOT="$tmp/sdk" KERNEL="$tmp/kernel"
+export http_proxy=http://127.0.0.1:1 HTTPS_PROXY=http://127.0.0.1:1 ALL_PROXY=socks5://127.0.0.1:1
 cat > "$tmp/sdk/platform-tools/adb" <<'MOCK'
 #!/usr/bin/env bash
 case "$*" in
@@ -22,6 +23,10 @@ esac
 MOCK
 cat > "$tmp/sdk/emulator/emulator" <<'MOCK'
 #!/usr/bin/env bash
+if [[ -n "${http_proxy:-}${https_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${all_proxy:-}${ALL_PROXY:-}" ]]; then
+  echo 'Unexpected inherited proxy environment' >&2
+  exit 1
+fi
 /bin/sleep 3
 MOCK
 cat > "$tmp/bin/sleep" <<'MOCK'

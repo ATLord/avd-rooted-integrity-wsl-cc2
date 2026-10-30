@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-server="$root/x86/xserver/vcxsrv.exe"
+server="${AVD_XSERVER:-$root/x86/xserver/vcxsrv.exe}"
 control="$root/x86/scripts/xserver-control.ps1"
 display_number="${AVD_X11_DISPLAY:-3}"
 [[ "$display_number" =~ ^[0-9]+$ && "$display_number" -le 999 ]] || { echo 'Invalid X display number.' >&2; exit 1; }
