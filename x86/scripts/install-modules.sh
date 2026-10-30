@@ -38,5 +38,9 @@ for name in susfs rezygisk pif tee; do
   "$adb" -s "$serial" push "$downloads/$name.zip" "/data/local/tmp/avd-$name.zip"
   "$adb" -s "$serial" shell "su -c '/data/adb/ksu/bin/ksud module install /data/local/tmp/avd-$name.zip'"
 done
+echo 'Installing VirtWifi boot service.'
+wifi_stage="/data/local/tmp/avd-wifi-service-$$.sh"
+"$adb" -s "$serial" push "$root/device/data_adb/service.d/10-wlan0-virtwifi.sh" "$wifi_stage"
+"$adb" -s "$serial" shell "su -c 'mkdir -p /data/adb/service.d && cp $wifi_stage /data/adb/service.d/10-wlan0-virtwifi.sh && chmod 755 /data/adb/service.d/10-wlan0-virtwifi.sh && rm -f $wifi_stage'"
 "$adb" -s "$serial" shell su -c sync
 echo 'Modules installed. Reboot the guest, wait for boot, then run configure-device.sh.'
