@@ -1,6 +1,6 @@
 # Windows x86-64 模拟器从零安装操作手册
 
-> 本手册适用于 Windows 网络接管版：请克隆 `windows-network-integration` 分支。界面修复版在本机独立测试 AVD 中验证了侧栏和双向文本复制粘贴；尚未在另一台干净电脑上完成复现。网络配置及测试边界见 [Windows 网络接管说明](WINDOWS-NETWORK.zh-CN.md)。
+> 本手册适用于 Windows 网络接管版：请克隆本仓库的默认分支。界面修复版在本机独立测试 AVD 中验证了侧栏和双向文本复制粘贴；尚未在另一台干净电脑上完成复现。网络配置及测试边界见 [Windows 网络接管说明](WINDOWS-NETWORK.zh-CN.md)。
 
 本手册面向第一次在 Windows 电脑上部署本项目的使用者。按顺序执行，每一阶段先检查结果，再继续下一阶段。它也适用于通过远程桌面操作的 Windows 电脑：**所有安装命令都要在目标电脑上运行**。
 
@@ -104,8 +104,8 @@ Get-PSDrive -PSProvider FileSystem |
 ```powershell
 New-Item -ItemType Directory -Force C:\avd-work | Out-Null
 cd C:\avd-work
-git clone --branch windows-network-integration https://github.com/ATLord/avd-rooted-integrity-wsl-ui.git avd-rooted-integrity-autoroot
-cd C:\avd-work\avd-rooted-integrity-autoroot
+git clone https://github.com/ATLord/avd-rooted-integrity-wsl-cc.git avd-rooted-integrity-wsl-cc
+cd C:\avd-work\avd-rooted-integrity-wsl-cc
 dir
 ```
 
@@ -119,7 +119,7 @@ dir
 sudo apt update
 sudo apt install -y openjdk-17-jre-headless curl unzip git python3 libpulse0 libxi6 libxkbfile1 libsm6 libice6 p7zip-full xauth x11-utils
 java -version
-cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
+cd /mnt/c/avd-work/avd-rooted-integrity-wsl-cc
 bash x86/scripts/install-sdk.sh
 bash x86/scripts/install-xserver.sh
 ```
@@ -164,7 +164,7 @@ ls -l /dev/kvm
 在 **Windows PowerShell**，而不是 Ubuntu 终端：
 
 ```powershell
-cd C:\avd-work\avd-rooted-integrity-autoroot
+cd C:\avd-work\avd-rooted-integrity-wsl-cc
 .\x86\build.ps1
 ```
 
@@ -182,7 +182,7 @@ Get-Item .\x86\out\bzImage-x86_64 | Select-Object FullName,Length
 在 **Ubuntu** 中：
 
 ```bash
-cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
+cd /mnt/c/avd-work/avd-rooted-integrity-wsl-cc
 bash x86/scripts/create-avd.sh
 bash x86/scripts/doctor.sh
 bash x86/scripts/start-x11.sh
@@ -206,7 +206,7 @@ bash x86/scripts/start-x11.sh
 模拟器开机完成后，在另一个 **Ubuntu** 终端：
 
 ```bash
-cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
+cd /mnt/c/avd-work/avd-rooted-integrity-wsl-cc
 bash x86/scripts/install-modules.sh
 ```
 
@@ -231,7 +231,7 @@ bash x86/scripts/install-modules.sh
 只对本项目的测试 AVD 操作。把自己有权使用的 keybox 保存在目标电脑的本地安全位置，例如 `C:\avd-private\keybox.xml`，然后在 **Ubuntu**：
 
 ```bash
-cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
+cd /mnt/c/avd-work/avd-rooted-integrity-wsl-cc
 bash x86/scripts/configure-device.sh /mnt/c/avd-private/keybox.xml
 "$HOME/Android/Sdk/platform-tools/adb" -s emulator-5554 reboot
 ```

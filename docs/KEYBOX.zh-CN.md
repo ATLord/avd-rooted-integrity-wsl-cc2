@@ -48,7 +48,7 @@ ls -l /mnt/c/avd-private/keybox.xml
 在 Ubuntu 进入**本自动 Root 版本**的项目目录。下面是示例，按实际项目位置调整：
 
 ```bash
-cd /mnt/c/avd-work/avd-rooted-integrity-autoroot
+cd /mnt/c/avd-work/avd-rooted-integrity-wsl-cc
 bash x86/scripts/configure-device.sh /mnt/c/avd-private/keybox.xml
 ```
 

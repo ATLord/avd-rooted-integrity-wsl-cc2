@@ -24,7 +24,7 @@
 
 ### 新增与可移植性
 
-- 平台矩阵（README「先确认你的机器」）和功能清单（[docs/FEATURES.md](docs/FEATURES.md)）。
+- 平台矩阵（README 第 1 节）和功能清单（[docs/FEATURES.md](docs/FEATURES.md)）。
 - `start-x11.sh` 在 WSL 镜像网络模式下用 `127.0.0.1`（NAT 模式不变），`AVD_X11_HOST` 可覆盖；AVD 已运行时不再启动又立即关闭 X server。
 - `start.sh` 支持 `ANDROID_SERIAL`（`emulator-<端口>`，默认 `emulator-5554`）；KVM 提示按 CPU 厂商选 `kvm_amd`/`kvm_intel`，使用实际的 `$WSL_DISTRO_NAME`，在非 WSL 的 Linux 上给出本机命令。
 - `scripts/start_avd.sh`（ARM 流程）在保留 macOS 默认路径的同时也查找 `~/Android/Sdk`。
