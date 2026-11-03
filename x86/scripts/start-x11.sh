@@ -9,7 +9,18 @@ for command in xauth xdpyinfo mcookie wslpath powershell.exe; do
   command -v "$command" >/dev/null || { echo "Missing dependency: $command" >&2; exit 1; }
 done
 [[ -f "$server" ]] || { echo 'Run bash x86/scripts/install-xserver.sh first.' >&2; exit 1; }
-host_ip="$(ip route show default | awk 'NR==1 {print $3}')"
+# NAT (default) networking: Windows is the default gateway. Mirrored networking
+# (.wslconfig networkingMode=mirrored): the default gateway is the real LAN
+# router, and Windows listeners are reached on localhost instead.
+# AVD_X11_HOST overrides the detection.
+networking_mode="$(wslinfo --networking-mode 2>/dev/null | tr -d '\r' || true)"
+if [[ -n "${AVD_X11_HOST:-}" ]]; then
+  host_ip="$AVD_X11_HOST"
+elif [[ "$networking_mode" == mirrored ]]; then
+  host_ip=127.0.0.1
+else
+  host_ip="$(ip route show default | awk 'NR==1 {print $3}')"
+fi
 [[ -n "$host_ip" ]] || { echo 'Unable to determine the Windows host address.' >&2; exit 1; }
 runtime="$(mktemp -d "${TMPDIR:-/tmp}/avd-x11.XXXXXX")"
 server_pid=''

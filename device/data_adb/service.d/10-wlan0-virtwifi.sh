@@ -1,8 +1,18 @@
 #!/system/bin/sh
+# Bring up wlan0 as a virt_wifi wrapper over eth0 and connect to VirtWifi.
+# On success, write the current boot_id to $READY so that 12-checkin.sh and the
+# host-side x86/scripts/start.sh know the network is up for THIS boot (a marker
+# left from a previous boot never matches).
+LOG="${AVD_WLAN_LOG:-/data/adb/wlan0-setup.log}"
+READY="${AVD_NET_READY:-/data/adb/avd-net-ready}"
+BOOT_ID_FILE="${AVD_BOOT_ID_FILE:-/proc/sys/kernel/random/boot_id}"
+rm -f "$READY"
+
 while [ "$(getprop sys.boot_completed)" != "1" ]; do sleep 2; done
 sleep 25
 
-LOG=/data/adb/wlan0-setup.log
+# Keep the previous boot's log for comparison instead of growing forever.
+[ -f "$LOG" ] && mv -f "$LOG" "$LOG.prev"
 {
   echo "=== $(date) start ==="
   /system/bin/ip link set eth0 up
@@ -25,6 +35,7 @@ LOG=/data/adb/wlan0-setup.log
       if /system/bin/cmd wifi status 2>/dev/null | grep -q 'Wifi is connected to "VirtWifi"'; then
         connected=1
         echo "VirtWifi connected (attempt $attempt)"
+        cat "$BOOT_ID_FILE" > "$READY"
         break
       fi
     fi
@@ -36,4 +47,4 @@ LOG=/data/adb/wlan0-setup.log
   /system/bin/dumpsys connectivity | grep -E "Active default|VALIDATED" | head -3
   /system/bin/ip addr show wlan0 | grep inet | head -3
   echo "=== done $(date) ==="
-} >> $LOG 2>&1
+} >> "$LOG" 2>&1

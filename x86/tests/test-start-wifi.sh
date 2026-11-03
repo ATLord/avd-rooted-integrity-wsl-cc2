@@ -4,8 +4,8 @@ root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 mkdir -p "$tmp/sdk/platform-tools" "$tmp/sdk/emulator" "$tmp/bin"
-touch "$tmp/kernel"
-export TEST_DIR="$tmp" ANDROID_SDK_ROOT="$tmp/sdk" KERNEL="$tmp/kernel"
+touch "$tmp/kernel" "$tmp/kvm"
+export TEST_DIR="$tmp" ANDROID_SDK_ROOT="$tmp/sdk" KERNEL="$tmp/kernel" AVD_KVM_DEVICE="$tmp/kvm"
 export http_proxy=http://127.0.0.1:1 HTTPS_PROXY=http://127.0.0.1:1 ALL_PROXY=socks5://127.0.0.1:1
 cat > "$tmp/sdk/platform-tools/adb" <<'MOCK'
 #!/usr/bin/env bash
@@ -16,6 +16,10 @@ case "$*" in
     count=0; [[ ! -e "$TEST_DIR/count" ]] || read -r count < "$TEST_DIR/count"
     count=$((count + 1)); echo "$count" > "$TEST_DIR/count"
     [[ "$count" -eq 3 ]] || echo 1 ;;
+  *'test -f /data/adb/service.d/10-wlan0-virtwifi.sh'*)
+    [[ "${SERVICE_PRESENT:-0}" != 1 ]] || echo present ;;
+  *'cat /proc/sys/kernel/random/boot_id'*) echo boot-1 ;;
+  *'cat /data/adb/avd-net-ready'*) [[ -z "${MARKER:-}" ]] || echo "$MARKER" ;;
   *'shell svc wifi enable'*) echo enable >> "$TEST_DIR/wifi.log" ;;
   *'shell cmd wifi connect-network VirtWifi open'*) echo connect >> "$TEST_DIR/wifi.log" ;;
   *'shell cmd wifi status'*) echo 'Wifi is connected to "VirtWifi"' ;;
@@ -35,7 +39,23 @@ cat > "$tmp/bin/sleep" <<'MOCK'
 MOCK
 chmod +x "$tmp/sdk/platform-tools/adb" "$tmp/sdk/emulator/emulator" "$tmp/bin/sleep"
 export PATH="$tmp/bin:$PATH"
-bash "$root/x86/scripts/start.sh"
-[[ $(grep -c '^enable$' "$tmp/wifi.log") -eq 2 ]]
-[[ $(grep -c '^connect$' "$tmp/wifi.log") -eq 2 ]]
-echo 'Wi-Fi setup ran once per simulated Android boot.'
+
+run_case() { rm -f "$tmp/seen" "$tmp/count" "$tmp/wifi.log"; touch "$tmp/wifi.log"; bash "$root/x86/scripts/start.sh" > "$tmp/out"; }
+count() { grep -c "^$1\$" "$tmp/wifi.log" || true; }
+
+# 1. No device-side service (older install): host connects once per boot.
+run_case
+[[ $(count enable) -eq 2 ]]
+[[ $(count connect) -eq 2 ]]
+grep -q 'host fallback' "$tmp/out"
+
+# 2. Device service present and ready for this boot: host never touches Wi-Fi.
+SERVICE_PRESENT=1 MARKER=boot-1 run_case
+[[ $(count enable) -eq 0 ]] || { echo 'Host ran Wi-Fi setup although the device service reported ready' >&2; exit 1; }
+grep -q 'device service' "$tmp/out"
+
+# 3. Device service present but its marker is stale: host falls back after the limit.
+SERVICE_PRESENT=1 MARKER=boot-0 AVD_WIFI_FALLBACK_ITERATIONS=3 run_case
+[[ $(count enable) -ge 1 ]] || { echo 'Host did not fall back when the device service never reported' >&2; exit 1; }
+
+echo 'Wi-Fi setup ran once per simulated Android boot; device service preferred, host fallback kept.'

@@ -29,6 +29,8 @@ done
 sleep 10
 
 if [ -e "$RELAUNCH_FLAG" ]; then mode=relaunch; else mode=alert-only; fi
+# Keep the previous boot's log instead of growing forever.
+[ -f "$LOG" ] && mv -f "$LOG" "$LOG.prev"
 {
   echo "=== $(date) watchdog start (mode: $mode) ==="
 } >> "$LOG" 2>&1

@@ -12,8 +12,22 @@ Windows 11、WSL 2.7.8、Ubuntu 22.04 NAT 网络及 v2rayN 7.25.4 TUN 模式。�
 
 1. 在 Windows 网络软件中按需开启或关闭 TUN/VPN，确认它确实接管 WSL 流量。代理软件只设置系统 HTTP 代理，不等同于 TUN。
 2. 在 Android 的 VirtWifi 网络详情中，将 Proxy 设为 **None**。删除之前配置的手动 Wi-Fi 代理；它不会随网络地址改变而自动更新。
-3. 按 README 启动 AVD。启动脚本不会继承 shell 中的 HTTP/SOCKS 代理环境变量；外部网络由 Windows 的网络路由决定。
+3. 按 README 启动 AVD。启动脚本默认不会继承 shell 中的 HTTP/SOCKS 代理环境变量，外部网络由 Windows 的网络路由决定。确实需要把当前代理变量传给模拟器时，用 `AVD_KEEP_PROXY=1 bash x86/scripts/start-x11.sh` 启动。
 4. 完成模块和 XML 配置、重启 Android 后，开机初始化需要一些时间：等待 VirtWifi 连接，再用 `AVD_NAME=你的AVD名称 bash x86/scripts/check-network.sh` 检查 Wi-Fi、DNS 和 HTTP 连接。该脚本打印各项结果，退出码不能单独代表所有探测均成功。
 5. 测试 TUN 打开与关闭两种情况，并在切换后重新启动模拟器验证。需要完全走 VPN 时，也要检查 VPN 的分流策略，以及 UDP、DNS 和其他应用行为。无 VPN 时 Google 超时不一定是程序错误。
 
 如果当前 VPN 与 WSL NAT 不兼容，请检查该 VPN 软件的 WSL/虚拟网卡支持；不要通过关闭防火墙解决。排查时先分别检查 Windows、WSL 和 AVD，再查看 VPN 软件日志。无论哪种网络方式，Play Integrity 必须通过实际请求与服务端返回结果另行验证。
+
+## Wi-Fi 由谁负责连接
+
+安装模块后，设备端的 `/data/adb/service.d/10-wlan0-virtwifi.sh` 负责创建 `wlan0` 并连接 VirtWifi，最多重试约 8 分钟。连接成功后，它把本次开机的 `boot_id` 写入 `/data/adb/avd-net-ready`。
+
+- `start.sh` 检测到设备上有这个服务时，只等待本次开机的标记，并打印 `Wi-Fi connected to VirtWifi (device service).`。约 10 分钟仍没有标记时，回退到主机端连接。
+- 尚未安装该服务的旧设备，仍由 `start.sh` 在主机端执行 `svc wifi enable` 和 `connect-network`，并打印 `(host fallback)`。
+- `12-checkin.sh` 先等待本次开机的标记（最多 10 分钟），再等待 VALIDATED 网络，最后无论结果如何都会发送一次 check-in。上一次开机留下的标记不会被当作就绪。
+
+设备端日志 `/data/adb/wlan0-setup.log`、`checkin-nudge.log` 和 `tee-watchdog.log` 每次开机会重写，上一次开机的内容保留为对应的 `.prev` 文件。
+
+## 镜像网络模式下的显示
+
+`start-x11.sh` 通过 `wslinfo --networking-mode` 判断网络模式。NAT 模式使用默认网关作为 Windows 地址，与之前相同；镜像模式（`networkingMode=mirrored`）改用 `127.0.0.1` 连接 VcXsrv。自动判断不符合实际情况时，用 `AVD_X11_HOST=<地址>` 指定。
