@@ -16,8 +16,22 @@
 
 配置 XML 请阅读 **[keybox.xml 配置教程](docs/KEYBOX.zh-CN.md)**。项目不会提供或自动生成有效 keybox。
 
+## 先确认你的机器
+
+Android 模拟器只有 x86_64 和 Apple Silicon 版本，没有 Linux ARM64 或 Windows on ARM 版本。先对照下表，再决定走哪条流程：
+
+| 你的机器 | 架构 | 走哪条流程 |
+| --- | --- | --- |
+| Windows x86-64（Intel/AMD） | x86_64 | 本文 + [从零安装操作手册](docs/INSTALLATION.zh-CN.md)，在 WSL2 Ubuntu 中构建运行 |
+| Linux x86-64 本机 | x86_64 | 未单独编写文档，但核心脚本可移植：用 `kernel-build`/容器直接构建，`create-avd.sh`、`start.sh`、模块与验证脚本可直接用；显示用系统自带 X，不需要 `install-xserver.sh`/`start-x11.sh`（这两个及 `build.ps1` 是 Windows 专用） |
+| macOS Apple Silicon | arm64 | 上游原流程：[docs/UPSTREAM_README.md](docs/UPSTREAM_README.md) + [docs/REPRODUCTION.md](docs/REPRODUCTION.md)，用 `kernel-build/` 构建 arm64 内核，再用 `scripts/start_avd.sh` 启动 |
+| Linux ARM64 / Windows on ARM（如骁龙笔记本） | arm64 | **暂不支持**：这些平台没有官方 Android 模拟器，本项目无法在其上运行 |
+
+两条流程共用同一套设备端配置（`device/`）和同一套安装、验证脚本（`scripts/install-device-setup.sh`、`scripts/verify-integrity.sh`）。各入口及其适用平台见 [docs/FEATURES.md](docs/FEATURES.md)。无论哪条流程，部署成功都不等于 Play Integrity 通过，必须用真实请求和服务端返回另行验证。
+
 ## 目录
 
+- [先确认你的机器](#先确认你的机器)
 - [当前结果和限制](#当前结果和限制)
 - [环境准备与安装](#准备环境)
 - [构建和创建模拟器](#构建和创建模拟器)
