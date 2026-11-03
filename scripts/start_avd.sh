@@ -28,6 +28,9 @@ if [[ -n "${EMULATOR:-}" ]]; then
     EMU="$EMULATOR"
 elif [[ -n "${ANDROID_SDK_ROOT:-}" && -x "$ANDROID_SDK_ROOT/emulator/emulator" ]]; then
     EMU="$ANDROID_SDK_ROOT/emulator/emulator"
+elif [[ ! -x "$HOME/Library/Android/sdk/emulator/emulator" && -x "$HOME/Android/Sdk/emulator/emulator" ]]; then
+    # Android Studio's default SDK location on Linux.
+    EMU="$HOME/Android/Sdk/emulator/emulator"
 else
     EMU="$HOME/Library/Android/sdk/emulator/emulator"
 fi

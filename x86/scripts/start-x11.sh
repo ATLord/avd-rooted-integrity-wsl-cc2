@@ -9,6 +9,13 @@ for command in xauth xdpyinfo mcookie wslpath powershell.exe; do
   command -v "$command" >/dev/null || { echo "Missing dependency: $command" >&2; exit 1; }
 done
 [[ -f "$server" ]] || { echo 'Run bash x86/scripts/install-xserver.sh first.' >&2; exit 1; }
+# Do not start (and then immediately stop) a second X server for an emulator
+# that is already running with its own display.
+adb="${ANDROID_SDK_ROOT:-$HOME/Android/Sdk}/platform-tools/adb"
+if [[ -x "$adb" ]] && "$adb" -s "${ANDROID_SERIAL:-emulator-5554}" emu avd name 2>/dev/null | tr -d '\r' | grep -qx "${AVD_NAME:-Pixel_9_Pro_XL_x86}"; then
+  echo "${AVD_NAME:-Pixel_9_Pro_XL_x86} is already running."
+  exit 0
+fi
 # NAT (default) networking: Windows is the default gateway. Mirrored networking
 # (.wslconfig networkingMode=mirrored): the default gateway is the real LAN
 # router, and Windows listeners are reached on localhost instead.
