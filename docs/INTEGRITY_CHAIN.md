@@ -28,11 +28,13 @@ rooted in real TEE hardware. On an emulator there is no such hardware, so:
   spoofed `ro.*.security_patch` props. It's written **and pinned immutable** by
   `00-make-fakes.sh` because PIF's action.sh otherwise truncates the `system=`
   line (observed as `system=202605`), which is a hard integrity failure.
-- `service.d/05-tee-watchdog.sh` relaunches TEESimulator **only if it has died** —
-  if the daemon is down when a PI request lands, keystore2 falls through to raw
-  software keymint with no keybox and the verdict comes back **empty**. (Note: a
-  watchdog relaunch mid-session would land in PATCH mode; in practice the daemon
-  doesn't die, but if integrity is ever lost, the fix is a clean cold reboot.)
+- `service.d/05-tee-watchdog.sh` watches TEESimulator. If the daemon is down when
+  a PI request lands, keystore2 falls through to raw software keymint with no
+  keybox and the verdict comes back **empty**. A relaunch mid-session would land
+  in PATCH mode (also an empty verdict), so by default the watchdog **only alerts**
+  (`/data/adb/tee-watchdog.log` and logcat tag `tee-watchdog`) and the fix is a
+  clean cold reboot. The original auto-relaunch is kept behind a flag:
+  `su -c touch /data/adb/avd-fake/tee-watchdog-relaunch` (re-read every 30 s).
 
 ## Layer 2 — no emulator fingerprint in identity props
 
@@ -175,7 +177,7 @@ boot
  │  TrickyStore service.sh launches TEESimulator EARLY -> GENERATE mode
  ├─ zygote starts → ReZygisk injects PIF
  └─ service.d/ (after boot_completed)
-      05 tee-watchdog (relaunches TEESimulator ONLY if it has died)
+      05 tee-watchdog (alerts if TEESimulator died; relaunch only with flag)
       08 tee-broken (re-assert immutable tee_status + security_patch; NO restart)
       09 display (match Pixel metrics)
       10 wlan0-virtwifi (bring up Wi-Fi)

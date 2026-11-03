@@ -310,7 +310,7 @@ be deleted for it to reproduce elsewhere.)
 | `CANNOT_ATTEST_IDS` spam, identity still `emu64a` | prop spoof / build.prop bind didn't apply before keymint | Cold reboot (scripts run in order). Don't `killall keymint`. |
 | `MODEL=Pixel Fold` / `DEVICE=felix` | `autopif` overwrote the profile | Re-copy tokay `device/pif/custom.pif.prop`, cold reboot, never autopif. |
 | Verdict empty but chain is GENERATE + not revoked | device not certified yet / no GSF android_id | Ensure Wi-Fi is connected; let it check in; cold reboot. |
-| `TEESimulator not running` | daemon died | `05-tee-watchdog.sh` relaunches it; if not, cold reboot. |
+| `TEESimulator not running` | daemon died | Cold reboot. `05-tee-watchdog.sh` logs it to `/data/adb/tee-watchdog.log` but does not relaunch by default (a late relaunch lands in PATCH mode); `touch /data/adb/avd-fake/tee-watchdog-relaunch` restores the old auto-relaunch. |
 | Works on reference, fails on yours, configs identical | keybox `0600` (unreadable by injected TEESimulator) | `chmod 644` the keybox (install script now does this), cold reboot. |
 
 ## Layout reference
@@ -320,7 +320,7 @@ kernel-build/        Docker + scripts that build the custom kernel
 device/
   data_adb/          → pushed to /data/adb on the device
     post-fs-data.d/  prop spoofs + bind mounts (run before zygote)
-    service.d/       tee-watchdog, tee-broken (re-assert immutable, NO restart), display, wlan0
+    service.d/       tee-watchdog (alert-only), tee-broken (re-assert immutable, NO restart), display, wlan0
     tricky_store/    target/security_patch/tee_status + keybox (gitignored, 0644)
     susfs4ksu/       SUSFS rule files
     avd-fake/        fake /proc/* + /vendor/build.prop contents

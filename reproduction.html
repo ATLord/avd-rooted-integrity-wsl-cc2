@@ -229,7 +229,7 @@ keystore2: ... "TEESimulator_AttestationCheck" ... Error::Km(CANNOT_ATTEST_IDS) 
           <tr><td><code>CANNOT_ATTEST_IDS</code> spam, identity still <code>emu64a</code></td><td>prop spoof / build.prop bind didn't apply before keymint</td><td>Cold reboot (scripts run in order). Don't <code>killall keymint</code>.</td></tr>
           <tr><td><code>MODEL=Pixel Fold</code> / <code>DEVICE=felix</code></td><td><code>autopif</code> overwrote the profile</td><td>Re-copy the pinned <code>device/pif/custom.pif.prop</code>, cold reboot, never autopif.</td></tr>
           <tr><td>Verdict empty but chain is GENERATE + not revoked</td><td>device not certified yet / no GSF android_id</td><td>Ensure Wi-Fi is connected; let it check in; cold reboot.</td></tr>
-          <tr><td><code>TEESimulator not running</code></td><td>daemon died</td><td><code>05-tee-watchdog.sh</code> relaunches it; if not, cold reboot.</td></tr>
+          <tr><td><code>TEESimulator not running</code></td><td>daemon died</td><td>Cold reboot. <code>05-tee-watchdog.sh</code> logs it but does not relaunch by default (a late relaunch lands in PATCH mode); <code>touch /data/adb/avd-fake/tee-watchdog-relaunch</code> restores auto-relaunch.</td></tr>
           <tr><td>Works on reference, fails on yours, configs identical</td><td>keybox <code>0600</code> (unreadable by injected TEESimulator)</td><td><code>chmod 644</code> the keybox (install script does this), cold reboot.</td></tr>
         </tbody>
       </table>
