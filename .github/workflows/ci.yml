@@ -1,0 +1,50 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck
+      - name: shellcheck (host and device scripts)
+        # Scripts are checked against their own shebang (bash or /system/bin/sh).
+        # Severity "warning" catches quoting and logic bugs without style noise.
+        run: |
+          git ls-files -z '*.sh' ':!device/data_adb/susfs4ksu/config.sh' | xargs -0 shellcheck -S warning
+          # Sourced config without a shebang.
+          shellcheck -S warning -s sh device/data_adb/susfs4ksu/config.sh
+      - name: Executable bits
+        run: |
+          bad=$(git ls-files -s -- '*.sh' '*.py' | awk '$1 != "100755" {print $4}' | grep -v '^device/data_adb/susfs4ksu/config.sh$' || true)
+          if [ -n "$bad" ]; then echo "Not executable in git:"; echo "$bad"; exit 1; fi
+      - name: Python syntax
+        run: python3 -m py_compile x86/scripts/patch-kernelsu.py
+
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Mock-based tests (no emulator or device)
+        run: |
+          set -e
+          for t in x86/tests/*.sh tests/*.sh; do
+            echo "== $t"
+            bash "$t"
+          done
+
+  kernel-build-image:
+    # Builds only the shared toolchain image used by both the ARM (kernel-build)
+    # and x86 (x86/Dockerfile) flows. It does not fetch or compile the kernel.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t avd-integrity-upstream-build kernel-build
+      - run: docker build -f x86/Dockerfile -t avd-integrity-x86-build .
