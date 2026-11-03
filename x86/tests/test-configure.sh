@@ -11,6 +11,7 @@ case "$*" in
   *'emu avd name'*) echo Pixel_9_Pro_XL_x86 ;;
   *'su -c id'*) echo 'uid=0(root)' ;;
   *'test -d /data/adb/modules/playintegrityfix'*) echo ok ;;
+  *'sh /data/local/tmp/avd-setup/install.sh'*) printf 'OK\nAVD_SETUP_RC=0\n' ;;
 esac
 MOCK
 chmod +x "$tmp/sdk/platform-tools/adb"

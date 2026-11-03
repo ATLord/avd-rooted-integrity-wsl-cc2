@@ -74,50 +74,73 @@ echo "==> installing into /data/adb (as root)"
 # security_patch.txt / tee_status.txt; a single EPERM must not abort the whole
 # install and leave /data/adb half-written. We clear every immutable bit FIRST,
 # then copy, so the install is idempotent and self-healing.
-adb shell "su -c '
-  # 0) Clear any immutable bits left by a prior boot (so every cp below works).
-  chattr -i /data/adb/tricky_store/security_patch.txt 2>/dev/null
-  chattr -i /data/adb/tricky_store/tee_status.txt     2>/dev/null
+#
+# Every step still runs, but each failure is counted and reported, and the
+# script exits non-zero at the end instead of printing a false "OK". The
+# device-side script is pushed as a file so its $variables and quotes are
+# evaluated on the device, not by this host shell.
+INSTALL_SCRIPT="$(mktemp)"
+trap 'rm -f "$INSTALL_SCRIPT"' EXIT
+cat > "$INSTALL_SCRIPT" <<DEVICE
+STAGE=$STAGE
+DEVICE
+cat >> "$INSTALL_SCRIPT" <<'DEVICE'
+rc=0
+step() { "$@" || { echo "FAILED: $*" >&2; rc=1; }; }
 
-  mkdir -p /data/adb/post-fs-data.d /data/adb/service.d
-  cp -f  $STAGE/post-fs-data.d/*.sh /data/adb/post-fs-data.d/
-  cp -f  $STAGE/service.d/*.sh      /data/adb/service.d/
-  mkdir -p /data/adb/avd-fake
-  cp -f  $STAGE/avd-fake/*          /data/adb/avd-fake/
+# 0) Clear any immutable bits left by a prior boot (so every cp below works).
+chattr -i /data/adb/tricky_store/security_patch.txt 2>/dev/null
+chattr -i /data/adb/tricky_store/tee_status.txt     2>/dev/null
 
-  # SUSFS + TrickyStore config (do not clobber the keybox via the wildcard).
-  mkdir -p /data/adb/susfs4ksu /data/adb/tricky_store
-  cp -f  $STAGE/susfs4ksu/*        /data/adb/susfs4ksu/
-  cp -f  $STAGE/tricky_store/target.txt         /data/adb/tricky_store/
-  cp -f  $STAGE/tricky_store/security_patch.txt /data/adb/tricky_store/
+step mkdir -p /data/adb/post-fs-data.d /data/adb/service.d
+for f in "$STAGE"/post-fs-data.d/*.sh; do step cp -f "$f" /data/adb/post-fs-data.d/; done
+for f in "$STAGE"/service.d/*.sh;      do step cp -f "$f" /data/adb/service.d/; done
+step mkdir -p /data/adb/avd-fake
+for f in "$STAGE"/avd-fake/*;          do step cp -f "$f" /data/adb/avd-fake/; done
 
-  # Keybox: 0644 root:root. It must be world-READABLE: TEESimulator runs
-  # injected into the keystore2/keymint process (not as root), so a 0600
-  # root-only keybox is unreadable there and TEESimulator silently falls back to
-  # PATCH mode (broken chain). The known-good reference AVD ships it 0644.
-  cp -f  $STAGE/tricky_store/keybox.xml /data/adb/tricky_store/keybox.xml
-  chown root:root /data/adb/tricky_store/keybox.xml
-  chmod 644 /data/adb/tricky_store/keybox.xml
+# SUSFS + TrickyStore config (do not clobber the keybox via the wildcard).
+step mkdir -p /data/adb/susfs4ksu /data/adb/tricky_store
+for f in "$STAGE"/susfs4ksu/*;         do step cp -f "$f" /data/adb/susfs4ksu/; done
+step cp -f "$STAGE/tricky_store/target.txt"         /data/adb/tricky_store/
+step cp -f "$STAGE/tricky_store/security_patch.txt" /data/adb/tricky_store/
 
-  # tee_status.txt = tee_broken=true (08-tee-broken.sh re-asserts + locks at boot).
-  cp -f  $STAGE/tricky_store/tee_status.txt /data/adb/tricky_store/tee_status.txt
+# Keybox: 0644 root:root. It must be world-READABLE: TEESimulator runs
+# injected into the keystore2/keymint process (not as root), so a 0600
+# root-only keybox is unreadable there and TEESimulator silently falls back to
+# PATCH mode (broken chain). The known-good reference AVD ships it 0644.
+step cp -f "$STAGE/tricky_store/keybox.xml" /data/adb/tricky_store/keybox.xml
+step chown root:root /data/adb/tricky_store/keybox.xml
+step chmod 644 /data/adb/tricky_store/keybox.xml
 
-  # Install the PIF profile (single source of truth). PIF reads custom.pif.prop
-  # for its Build.* spoof; 00-make-fakes.sh derives everything else from it.
-  if [ -d /data/adb/modules/playintegrityfix ]; then
-    cp -f  $STAGE/custom.pif.prop /data/adb/modules/playintegrityfix/custom.pif.prop
-    chmod 644 /data/adb/modules/playintegrityfix/custom.pif.prop
-  fi
-  # Belt-and-suspenders: also seed modules_update/ so PIF does not autopif-fetch
-  # a different profile on first activation.
-  if [ -d /data/adb/modules_update/playintegrityfix ]; then
-    cp -f $STAGE/custom.pif.prop /data/adb/modules_update/playintegrityfix/custom.pif.prop
-  fi
+# tee_status.txt = tee_broken=true (08-tee-broken.sh re-asserts + locks at boot).
+step cp -f "$STAGE/tricky_store/tee_status.txt" /data/adb/tricky_store/tee_status.txt
 
-  chmod 0755 /data/adb/post-fs-data.d/*.sh /data/adb/service.d/*.sh
-  rm -rf $STAGE
-  echo OK
-'"
+# Install the PIF profile (single source of truth). PIF reads custom.pif.prop
+# for its Build.* spoof; 00-make-fakes.sh derives everything else from it.
+if [ -d /data/adb/modules/playintegrityfix ]; then
+  step cp -f "$STAGE/custom.pif.prop" /data/adb/modules/playintegrityfix/custom.pif.prop
+  step chmod 644 /data/adb/modules/playintegrityfix/custom.pif.prop
+fi
+# Belt-and-suspenders: also seed modules_update/ so PIF does not autopif-fetch
+# a different profile on first activation.
+if [ -d /data/adb/modules_update/playintegrityfix ]; then
+  step cp -f "$STAGE/custom.pif.prop" /data/adb/modules_update/playintegrityfix/custom.pif.prop
+fi
+
+for f in /data/adb/post-fs-data.d/*.sh /data/adb/service.d/*.sh; do step chmod 0755 "$f"; done
+# Always remove the staging copy (it holds the keybox), even after a failure.
+rm -rf "$STAGE"
+[ "$rc" -eq 0 ] && echo OK
+echo "AVD_SETUP_RC=$rc"
+DEVICE
+adb push "$INSTALL_SCRIPT" "$STAGE/install.sh" >/dev/null
+install_out="$(adb shell "su -c 'sh $STAGE/install.sh'" 2>&1 | tr -d '\r' || true)"
+printf '%s\n' "$install_out" | grep -v '^AVD_SETUP_RC=' || true
+if ! printf '%s\n' "$install_out" | grep -qx 'AVD_SETUP_RC=0'; then
+    echo "ERROR: installing into /data/adb failed (see FAILED lines above)." >&2
+    echo "       /data/adb may be partly updated; fix the cause and re-run this script." >&2
+    exit 1
+fi
 
 echo
 echo "==> done. Apply with a clean COLD REBOOT:"

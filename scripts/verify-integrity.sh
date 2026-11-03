@@ -12,17 +12,30 @@
 #   ./scripts/verify-integrity.sh --trigger    # fire a PI check, then verify
 #   ./scripts/verify-integrity.sh              # verify only (you trigger a check)
 #
+# --trigger is NOT read-only: it force-stops and clears Play Store data
+# (pm clear com.android.vending) and deletes the GMS droidguard cache, then
+# clears logcat, so that a fresh Play Integrity flow is captured.
+#
 # Other:
 #   ADB="adb -s emulator-5554" ./scripts/verify-integrity.sh --trigger
 
 set -uo pipefail
 ADB="${ADB:-adb}"
 TRIGGER=0
-[ "${1:-}" = "--trigger" ] && TRIGGER=1
+case "${1:-}" in
+  --trigger) TRIGGER=1 ;;
+  -h|--help) awk 'NR > 1 && /^#/ { sub(/^# ?/, ""); print; next } NR > 1 { exit }' "$0"; exit 0 ;;
+esac
 pass(){ printf '  \033[32m✓\033[0m %s\n' "$*"; }
 fail(){ printf '  \033[31m✗\033[0m %s\n' "$*"; FAILED=1; }
 note(){ printf '    %s\n' "$*"; }
-sh(){ $ADB shell "su -c \"$1\"" 2>/dev/null | tr -d '\r'; }
+# Run a shell snippet as root on the device, passed through verbatim.
+# adb joins its arguments into one string for the device shell, so the snippet
+# is wrapped in single quotes (embedded ' become '\'') and reaches `su -c`
+# unchanged — double quotes, $vars and pipes inside it are evaluated by the
+# root shell only, never by the outer adb shell.
+squote(){ printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
+sh(){ $ADB shell "su -c $(squote "$1")" 2>/dev/null | tr -d '\r'; }
 FAILED=0
 
 # The EXPECTED device comes from the active profile (single source of truth),
@@ -67,7 +80,7 @@ else
 fi
 
 echo "== Device registration (Play Protect needs a GSF android_id) =="
-aid=$(sh 'sqlite3 /data/data/com.google.android.gsf/databases/gservices.db "select value from main where name=\"android_id\";" 2>/dev/null')
+aid=$(sh "sqlite3 /data/data/com.google.android.gsf/databases/gservices.db \"select value from main where name='android_id';\" 2>/dev/null")
 if [ -n "$aid" ] && [ "$aid" != "0" ]; then pass "GSF android_id present ($aid) — device is checked in"
 else note "No GSF android_id yet (sqlite3 may be absent; not fatal). If the verdict"; note "stays empty with GENERATE mode, the device isn't certified yet — ensure"; note "Wi-Fi is connected, wait a few minutes, then cold reboot."; fi
 
@@ -80,7 +93,9 @@ fi
 
 echo "== Attestation MODE (the make-or-break check) =="
 gen=$(sh 'logcat -d | grep -c "Generating new attested key pair for alias: .integrity.api.key.alias"')
-pat=$(sh 'logcat -d | grep -c "patched certificate chain for KeyIdentifier(uid=10146"')
+# Match the integrity alias for ANY uid: the GMS uid differs between installs,
+# and a hard-coded uid silently reported 0 patches (false GENERATE pass).
+pat=$(sh 'logcat -d | grep -cE "patched certificate chain for KeyIdentifier\(uid=[0-9]+, alias=.?integrity\.api\.key\.alias"')
 caid=$(sh 'logcat -d | grep -c CANNOT_ATTEST_IDS')
 tok=$(sh 'logcat -d | grep -c "Integrity key attestation record generated successfully"')
 if [ "${gen:-0}" -gt 0 ] && [ "${pat:-0}" -eq 0 ]; then

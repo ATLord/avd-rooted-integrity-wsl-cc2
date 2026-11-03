@@ -122,7 +122,7 @@ didn't" cycle.
 **Verify the mode after boot:**
 ```bash
 adb shell su -c 'logcat -d | grep -c "Generating new attested key pair for alias: .integrity.api.key.alias"'  # want >0
-adb shell su -c 'logcat -d | grep -c "patched certificate chain for KeyIdentifier(uid=10146"'                 # want 0
+adb shell su -c 'logcat -d | grep -c "patched certificate chain for KeyIdentifier(uid=.*integrity.api.key.alias"'                 # want 0
 ```
 
 ## Layer 3 — `/proc/*` and devicetree don't say "ranchu/goldfish"
