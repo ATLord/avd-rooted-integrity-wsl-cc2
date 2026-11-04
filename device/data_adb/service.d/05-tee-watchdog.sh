@@ -52,7 +52,7 @@ while true; do
       {
         echo "[$(date)] TEESimulator is NOT running. Not relaunching: a post-boot relaunch"
         echo "  lands in PATCH mode and the Play Integrity verdict goes empty."
-        echo "  Recover with a cold reboot (adb reboot)."
+        echo "  Recover with a cold boot (adb emu kill, then restart the platform launcher)."
         echo "  To restore auto-relaunch instead: touch $RELAUNCH_FLAG"
       } >> "$LOG"
       log -t tee-watchdog "TEESimulator is not running; cold reboot required" 2>/dev/null

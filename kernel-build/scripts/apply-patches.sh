@@ -149,6 +149,7 @@ fi
 echo "==> Customizing kernel source for AVD anti-detection"
 bash "${ROOT}/scripts/customize-kernel.sh" "${KERNEL_DIR}"
 
+python3 "${ROOT}/scripts/check-boot-hooks.py" "${KERNEL_DIR}"
 touch "${KERNEL_DIR}/.avd-patches-applied"
 echo
 echo "==> All patches applied successfully."

@@ -4,13 +4,15 @@
 
 本项目改自 [tanishmeh/AVD_Rooted_Integrity](https://github.com/tanishmeh/AVD_Rooted_Integrity)（只支持 Apple Silicon 的 arm64）。在此基础上：
 
-- 新增 **Windows x86-64（WSL2）** 流程，Intel 和 AMD 电脑都已从零部署验证；
+- 新增 **Windows x86-64（WSL2）** 流程，Intel 和 AMD 有部署记录，但最新 Intel 嵌套虚拟化复测未通过结构检查；
 - 保留上游的 **macOS arm64** 流程，功能不删减；
 - 修复了验证脚本会给出错误结论等问题（见 [CHANGELOG](CHANGELOG.md)）。
 
 > **这是开发和测试工具，部署成功不等于 Play Integrity 通过。**
-> 作者在 Intel 本机上做过真实检测，Basic / Device / Strong 均为 **Failed**；AMD 虚拟机只取得网络错误，没有结论。结构检查全绿、TEESimulator 在运行，都不能证明服务端会认可。
+> 作者在 Intel 本机上做过真实检测，Basic / Device / Strong 均为 **Failed**；AMD 虚拟机只取得网络错误，没有结论。即使结构检查全绿、TEESimulator 在运行，也不能证明服务端会认可；这不是当前环境已经全绿的声明。
 > 项目**不提供 keybox**，需要你自己准备有权使用的文件，并且不验证它是否有效或已被撤销。
+
+本轮修复与复测步骤见 [启动链路修复说明](docs/BOOT-REPAIR.zh-CN.md)。安装脚本成功只表示文件部署成功；必须冷启动后验证本次 boot ID 的钩子证据。
 
 ## 1. 先确认你的机器能不能用
 
@@ -61,7 +63,7 @@ Google 只提供 x86_64 和 Apple Silicon 的 Android 模拟器，**没有** Lin
    ```powershell
    New-Item -ItemType Directory -Force C:\avd-work | Out-Null
    cd C:\avd-work
-   git -c core.autocrlf=false clone https://github.com/ATLord/avd-rooted-integrity-wsl-cc.git
+   git -c core.autocrlf=false clone https://github.com/ATLord/avd-rooted-integrity-wsl-cc2.git avd-rooted-integrity-wsl-cc
    cd avd-rooted-integrity-wsl-cc
    ```
 
@@ -116,6 +118,8 @@ Google 只提供 x86_64 和 Apple Silicon 的 Android 模拟器，**没有** Lin
     # 等模拟器窗口关闭、原来那个终端里 start-x11.sh 退出后，在那个终端再执行：
     bash x86/scripts/start-x11.sh
     ```
+冷启动后先执行 `PATH="$HOME/Android/Sdk/platform-tools:$PATH" bash scripts/check-boot.sh`，确认两个钩子及模块状态；失败时先看启动链路修复说明。
+
 11. **[另一个 Ubuntu 终端]** 配置你自己的 keybox（路径换成你的文件位置，Windows 的 `C:\keys\keybox.xml` 对应 `/mnt/c/keys/keybox.xml`），然后再冷重启一次，方法同上：
     ```bash
     bash x86/scripts/configure-device.sh /mnt/c/keys/keybox.xml
@@ -130,7 +134,7 @@ bash x86/scripts/check-device.sh      # Root、网络、结构检查
 bash x86/scripts/check-network.sh     # Wi-Fi、DNS、HTTPS 探测
 ```
 
-这两个脚本会逐项打印结果，**需要你自己看每一项**，退出码不能单独代表全部成功。它们也不会给出 Google 的认证判定，真实结果要用实际的 Play Integrity 检测应用另行验证。
+这两个脚本会逐项打印结果，**需要你自己看每一项**，`check-device.sh` 退出码：0=所检查结构与捕获的模式通过，1=检查失败，2=没有捕获 attestation 活动。`check-network.sh` 是逐项诊断，须阅读探测结果。它们也不会给出 Google 的认证判定，真实结果要用实际的 Play Integrity 检测应用另行验证。
 
 ## 4. macOS Apple Silicon（上游流程）
 
@@ -203,10 +207,12 @@ TEESimulator 看门狗默认只告警、不自动拉起；需要恢复上游的�
 
 ## 9. 当前验证状态
 
-- 已在 Intel 本机和 AMD Windows 虚拟机上从零完成：SDK、自定义内核、AVD、Root、四个模块、keybox 配置和结构检查。验证配置：Android 36 Google Play x86_64 系统镜像 **revision 7**（创建脚本只接受这个版本）、内核 6.6.66、KernelSU-Next 3.2.0、SUSFS 2.1.0、ReZygisk 1.0.0、PlayIntegrityFork v16、TEESimulator 3.2。
+- 历史部署记录（不代表本轮运行通过）：Intel 本机和 AMD Windows 虚拟机曾完成：SDK、自定义内核、AVD、Root、四个模块、keybox 配置和结构检查。验证配置：Android 36 Google Play x86_64 系统镜像 **revision 7**（创建脚本只接受这个版本）、内核 6.6.66、KernelSU-Next 3.2.0、SUSFS 2.1.0、ReZygisk 1.0.0、PlayIntegrityFork v16、TEESimulator 3.2。
 - 真实 Play Integrity 检测：Intel 本机 Basic / Device / Strong 均 Failed；AMD 虚拟机返回网络错误，无结论。
-- 已知限制：SUSFS 模块自带的 `ksu_susfs` 是 ARM64 可执行文件，在 x86_64 上无法运行，所以 SUSFS 用户空间规则不完整生效；`uname` 仍会暴露内核构建标识；Google 账号登录和 Android 应用内的剪贴板尚未验证。
+- 已知限制：SUSFS 模块自带的 `ksu_susfs` 是 ARM64 可执行文件，在 x86_64 上无法运行，所以 x86 安装现在跳过该模块，并禁用旧安装的同名模块；SUSFS 用户空间规则不生效；`uname` 仍会暴露内核构建标识；Google 账号登录和 Android 应用内的剪贴板尚未验证。
 - **最近一轮改进**（验证脚本修复、Wi-Fi 与 check-in 时序、看门狗等，见 [CHANGELOG](CHANGELOG.md)）只通过了不依赖真机的脚本测试，**还没有在真机上复测**。macOS 流程同样没有在 Mac 上重跑。
+
+- 最新用户复测：Intel + 嵌套虚拟化中身份、build.prop、cpuinfo、TEE 和 VirtWifi 未生效；本轮改动尚需在该环境冷启动复验。
 
 ## 10. 来源与许可
 

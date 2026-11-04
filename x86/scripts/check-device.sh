@@ -14,7 +14,10 @@ echo '== Network =='
 adb -s "$ANDROID_SERIAL" shell cmd wifi status | head -5 || true
 adb -s "$ANDROID_SERIAL" shell ping -c 1 -W 3 1.1.1.1 || true
 echo '== Project structural check (not a Play Integrity verdict) =='
-bash "$root/scripts/verify-integrity.sh"
+bash "$root/scripts/verify-integrity.sh" "$@"
+result=$?
 echo '== Native SUSFS tool (known ARM64-only limitation) =='
-adb -s "$ANDROID_SERIAL" shell su -c '/data/adb/ksu/bin/ksu_susfs --help' 2>&1 | head -3 || true
+echo 'SKIP: bundled ksu_susfs is ARM64-only; x86_64 userspace SUSFS rules are unsupported.'
 echo 'Review the checks above. A Play Integrity request and its server verdict require separate testing.'
+
+exit "$result"

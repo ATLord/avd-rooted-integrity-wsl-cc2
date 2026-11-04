@@ -1,5 +1,15 @@
 # 更新记录
 
+## 本地修复：启动证据与验证失败路径
+
+- 显式安装 APK 内 x86_64 ksud，并检查 init 使用的 /data/adb/ksud；安装完成显示 activation PENDING。
+- 两个生命周期入口记录当前 boot ID；新增 check-boot.sh；profile 生成记录单独的完成标记。
+- 构建校验 Wild/SUSFS read/stat/exec 调用点，统一 read-hook 参数；缺少调用时阻止产物生成。
+- profile 缺失、过期或字段缺失不再通过；逐项精确比对 system/boot/vendor patch；结构失败返回 1，无 attestation 活动返回 2。
+- TEE 首次启动与 watchdog 恢复分开说明，保留显式恢复 flag；统一冷启动说明。
+- x86 跳过 ARM64 SUSFS 模块，网络探测打印完整输出和状态；创建 AVD 后校验设备名与屏幕尺寸。
+- 仅本地脚本/模拟测试；没有声称内核已编译、AVD 已修复或 Play Integrity 已通过。详见 docs/BOOT-REPAIR.zh-CN.md。
+
 本文记录对上游项目的行为变化，重点是可能改变现有用户结果的改动，以及如何恢复旧行为。日期为改动合入日期。
 
 ## 未发布

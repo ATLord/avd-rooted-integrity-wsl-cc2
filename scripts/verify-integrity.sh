@@ -37,12 +37,22 @@ note(){ printf '    %s\n' "$*"; }
 squote(){ printf "'%s'" "$(printf '%s' "$1" | sed "s/'/'\\\\''/g")"; }
 sh(){ $ADB shell "su -c $(squote "$1")" 2>/dev/null | tr -d '\r'; }
 FAILED=0
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+bash "$ROOT/scripts/check-boot.sh" || fail "KernelSU lifecycle validation failed"
+INCOMPLETE=0
 
+generated=$(sh 'test -s /data/adb/avd-fake/profile.env && echo present')
+[ "$generated" = present ] || fail "profile.env missing/empty: inspect make-fakes.log and post-fs-data hook"
+boot=$(sh 'cat /proc/sys/kernel/random/boot_id')
+profile_boot=$(sh 'cat /data/adb/avd-fake/profile.boot')
+[ -n "$boot" ] && [ "$profile_boot" = "$boot" ] || fail "profile generation not completed during current boot"
+wifi=$(sh 'cmd wifi status')
+printf '%s\n' "$wifi" | grep -q 'Wifi is connected to "VirtWifi"' && pass "VirtWifi connected" || fail "VirtWifi not connected (eth0 IP connectivity is independent)"
 # The EXPECTED device comes from the active profile (single source of truth),
 # so this works for any profile, not just tokay.
 WANT=$(sh 'sed -n "s/^DEVICE=//p" /data/adb/avd-fake/profile.env 2>/dev/null | tr -d "\"" | head -n1')
 [ -z "$WANT" ] && WANT=$(sh 'sed -n "s/^DEVICE=//p" /data/adb/modules/playintegrityfix/custom.pif.prop 2>/dev/null | head -n1')
-[ -z "$WANT" ] && WANT=tokay
+[ -n "$WANT" ] || fail "DEVICE missing from both generated and installed profiles; identity cannot be verified"
 
 echo "== Identity (every namespace must = profile device '$WANT', not emu64a) =="
 dev=$(sh 'getprop ro.product.vendor.device')
@@ -57,7 +67,7 @@ fps=$(sh 'for n in "" .vendor .system .product .odm; do getprop ro$n.build.finge
 nfp=$(printf '%s\n' "$fps" | grep -c .)
 [ "$nfp" = "1" ] && pass "all build.fingerprints agree ($(printf '%s' "$fps" | head -c 60)…)" || { fail "fingerprints DISAGREE across namespaces ($nfp distinct):"; printf '%s\n' "$fps" | sed 's/^/      /'; }
 vb=$(sh 'grep "^ro.product.vendor.device" /vendor/build.prop')
-echo "$vb" | grep -q "$WANT" && pass "/vendor/build.prop bind-mounted ($WANT)" || fail "/vendor/build.prop not spoofed: $vb"
+[ -n "$WANT" ] && [ "$vb" = "ro.product.vendor.device=$WANT" ] && pass "/vendor/build.prop bind-mounted ($WANT)" || fail "/vendor/build.prop not spoofed: $vb"
 
 echo "== /proc + devicetree clean =="
 [ "$(sh 'grep -m1 implementer /proc/cpuinfo' | grep -o '0x41')" = "0x41" ] && pass "cpuinfo implementer 0x41" || fail "cpuinfo implementer not 0x41"
@@ -67,16 +77,23 @@ n=$(sh 'cat /proc/cpuinfo /proc/version 2>/dev/null | grep -ic ranchu')
 [ "${n:-1}" = "0" ] && pass "no 'ranchu' in cpuinfo/version" || fail "'ranchu' leaks in /proc ($n)"
 
 echo "== TEESimulator alive + keybox readable =="
-ts=$(sh 'pidof TEESimulator'); [ -n "$ts" ] && pass "TEESimulator running (pid $ts)" || fail "TEESimulator NOT running"
+ts=$(sh 'pidof TEESimulator'); [ -n "$ts" ] && pass "TEESimulator running (pid $ts)" || {
+  fail "TEESimulator NOT running"
+  note "Initial launch belongs to tricky_store/service.sh; check lifecycle, module status and logs, then cold boot."
+  note "Optional recovery: adb shell su -c touch /data/adb/avd-fake/tee-watchdog-relaunch"
+  note "This flag requires a running watchdog and may produce PATCH mode; it is not an attestation fix."
+}
 kb=$(sh 'ls -l /data/adb/tricky_store/keybox.xml'); echo "$kb" | grep -q 'rw-r--r--' && pass "keybox.xml is 0644 (readable by injected TEESimulator)" || { fail "keybox.xml perms wrong:"; note "$kb"; note "must be 0644 — chmod 644 it and cold reboot"; }
 # security_patch.txt must be per-component AND match the profile patch.
 wantpatch=$(sh 'sed -n "s/^SECURITY_PATCH=//p" /data/adb/avd-fake/profile.env 2>/dev/null | tr -d "\"" | head -n1')
-sp=$(sh 'cat /data/adb/tricky_store/security_patch.txt' | head -1)
-if echo "$sp" | grep -q "^system="; then
-  [ -z "$wantpatch" ] && pass "security_patch.txt keyed per-component ($sp)" || \
-  { echo "$sp" | grep -q "$wantpatch" && pass "security_patch.txt matches profile ($wantpatch)" || fail "security_patch.txt=$sp but profile patch=$wantpatch (must match)"; }
+if [ -z "$wantpatch" ]; then
+  fail "SECURITY_PATCH missing from profile.env; cannot verify security_patch.txt"
 else
-  fail "security_patch.txt first line='$sp' — must be 'system=YYYY-MM-DD' (NOT all=)"
+  patches=$(sh 'cat /data/adb/tricky_store/security_patch.txt')
+  for component in system boot vendor; do
+    actual=$(printf '%s\n' "$patches" | sed -n "s/^$component=//p")
+    [ "$actual" = "$wantpatch" ] && pass "$component patch matches profile ($wantpatch)" || fail "$component patch='$actual', expected '$wantpatch'"
+  done
 fi
 
 echo "== Device registration (Play Protect needs a GSF android_id) =="
@@ -104,9 +121,10 @@ if [ "${gen:-0}" -gt 0 ] && [ "${pat:-0}" -eq 0 ]; then
 elif [ "${pat:-0}" -gt 0 ]; then
   fail "TEESimulator in PATCH mode ($pat patch) — verdict will be EMPTY."
   note "Cause: an out-of-band restart of keymint/keystore2/TEESimulator flipped it."
-  note "Fix:   adb reboot  (clean COLD boot). NEVER killall those services by hand."
+  note "Fix:   adb emu kill, then restart with the platform launcher (-no-snapshot). NEVER killall those services by hand."
 else
-  note "No integrity.api.key.alias activity captured."
+  INCOMPLETE=1
+  note "INCOMPLETE: No integrity.api.key.alias activity captured; no attestation conclusion."
   note "Re-run WITH a trigger:  ./scripts/verify-integrity.sh --trigger"
 fi
 note "CANNOT_ATTEST_IDS lines this window: ${caid:-?} (a few at early boot are ok)"
@@ -114,3 +132,7 @@ note "CANNOT_ATTEST_IDS lines this window: ${caid:-?} (a few at early boot are o
 echo
 if [ "$FAILED" = "0" ]; then printf '\033[32mStructural checks passed.\033[0m If MODE=GENERATE + token issued but a checker still shows empty, it is certification (see registration note) — connect Wi-Fi, wait, cold reboot.\n'
 else printf '\033[31mSome checks failed — see above.\033[0m If MODE is PATCH: cold reboot. Never restart services by hand.\n'; fi
+
+[ "$FAILED" = 0 ] || exit 1
+[ "$INCOMPLETE" = 0 ] || exit 2
+exit 0

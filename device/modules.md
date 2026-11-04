@@ -46,7 +46,8 @@ done
 # Then run scripts/install-device-setup.sh — it installs your keybox AND the
 # custom.pif.prop profile (into both modules/ and modules_update/ so PIF can't
 # autopif-fetch a different profile), and cold-reboot.
-adb reboot
+adb emu kill
+# Wait for exit; restart with scripts/start_avd.sh (Mac) or x86/scripts/start-x11.sh (Windows).
 ```
 
 > Do **not** run `autopif` on the real AVD. It overwrites `custom.pif.prop` with
@@ -105,3 +106,5 @@ need to hand-edit build.props. You should still pick a `custom.pif.prop` profile
 whose device is a real Pixel; ideally one from a similar Android era. The module
 versions below are the validated set — for a much newer system image you may need
 newer module releases (use each project's latest release).
+
+On x86_64, install-modules.sh skips the ARM64-only SUSFS userspace module. After cold start, run scripts/check-boot.sh before configuring the device. See docs/BOOT-REPAIR.zh-CN.md.

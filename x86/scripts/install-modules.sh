@@ -14,7 +14,6 @@ fetch() {
   fi
 }
 fetch KernelSU.apk 'https://github.com/KernelSU-Next/KernelSU-Next/releases/download/v3.2.0/KernelSU_Next_v3.2.0_33129-release.apk' 96c2bbbf1b973461fe82dd1ed17f89deb86a6a5a9d7c4cf079bd32091131ef57
-fetch susfs.zip 'https://github.com/sidex15/susfs4ksu-module/releases/download/v1.5.2%2B_R27/ksu_module_susfs_1.5.2%2B.zip' 0e5d86aaa36f8ff71a67c189d3469fb9d9468327e7b7eb173781c91fd00dc366
 fetch rezygisk.zip 'https://github.com/PerformanC/ReZygisk/releases/download/v1.0.0/ReZygisk-v1.0.0-release.zip' 7904649b8dcaf2b060c3432df4fee302aeb1258da199d2b425335e82d49510e6
 fetch pif.zip 'https://github.com/osm0sis/PlayIntegrityFork/releases/download/v16/PlayIntegrityFork-v16.zip' 3bd4d59fde43e1def793012415d1af544fd0d94ad91dbcfd4c79c4f939ebe412
 fetch tee.zip 'https://github.com/JingMatrix/TEESimulator/releases/download/v3.2/TEESimulator-v3.2-67-Release.zip' af8d38e427d6f8893305d9dba00256e0ba6e1afbadf32aab5ca8afc785404aab
@@ -34,13 +33,30 @@ if ! "$adb" -s "$serial" shell su -c id 2>/dev/null | grep -q 'uid=0'; then
   exit 1
 fi
 echo 'ADB Shell Root 已自动启用。'
-for name in susfs rezygisk pif tee; do
+# Install the daemon from the checksum-verified APK, not an assumed existing
+# bin/ksud. init executes /data/adb/ksud; root alone proves neither its presence
+# nor that the manager finished its asynchronous userspace installation.
+unzip -p "$downloads/KernelSU.apk" lib/x86_64/libksud.so > "$downloads/ksud-x86_64"
+[[ -s "$downloads/ksud-x86_64" ]] || { echo 'APK lacks x86_64 ksud' >&2; exit 1; }
+"$adb" -s "$serial" push "$downloads/ksud-x86_64" /data/local/tmp/avd-ksud
+"$adb" -s "$serial" shell "su -c 'chmod 755 /data/local/tmp/avd-ksud && /data/local/tmp/avd-ksud install && test -x /data/adb/ksud && /data/adb/ksud --version'"
+"$adb" -s "$serial" shell "su -c 'rm -f /data/local/tmp/avd-ksud'"
+echo 'SKIP: bundled SUSFS userspace module is ARM64-only. Kernel SUSFS support remains available.'
+# Disable a previously installed incompatible module; keep its files for review.
+"$adb" -s "$serial" shell "su -c 'for d in /data/adb/modules/susfs4ksu /data/adb/modules_update/susfs4ksu; do if [ -d \"\$d\" ]; then touch \"\$d/disable\" || exit 1; fi; done'"
+for name in rezygisk pif tee; do
   "$adb" -s "$serial" push "$downloads/$name.zip" "/data/local/tmp/avd-$name.zip"
-  "$adb" -s "$serial" shell "su -c '/data/adb/ksu/bin/ksud module install /data/local/tmp/avd-$name.zip'"
+  "$adb" -s "$serial" shell "su -c '/data/adb/ksud module install /data/local/tmp/avd-$name.zip'"
+done
+echo 'Installing lifecycle probes.'
+for stage in post-fs-data service; do
+  directory="$stage.d"
+  "$adb" -s "$serial" push "$root/device/data_adb/$directory/00-boot-probe.sh" /data/local/tmp/avd-boot-probe.sh
+  "$adb" -s "$serial" shell "su -c 'mkdir -p /data/adb/$directory && cp /data/local/tmp/avd-boot-probe.sh /data/adb/$directory/00-boot-probe.sh && chmod 755 /data/adb/$directory/00-boot-probe.sh && rm -f /data/local/tmp/avd-boot-probe.sh'"
 done
 echo 'Installing VirtWifi boot service.'
 wifi_stage="/data/local/tmp/avd-wifi-service-$$.sh"
 "$adb" -s "$serial" push "$root/device/data_adb/service.d/10-wlan0-virtwifi.sh" "$wifi_stage"
 "$adb" -s "$serial" shell "su -c 'mkdir -p /data/adb/service.d && cp $wifi_stage /data/adb/service.d/10-wlan0-virtwifi.sh && chmod 755 /data/adb/service.d/10-wlan0-virtwifi.sh && rm -f $wifi_stage'"
 "$adb" -s "$serial" shell su -c sync
-echo 'Modules installed. Reboot the guest, wait for boot, then run configure-device.sh.'
+echo 'Files installed; activation PENDING. adb emu kill, wait for launcher exit, restart start-x11.sh, then run scripts/check-boot.sh before configure-device.sh.'

@@ -41,6 +41,7 @@ TS=/data/adb/tricky_store
 PIF=/data/adb/modules/playintegrityfix/custom.pif.prop
 
 mkdir -p "$FAKE"
+rm -f "$FAKE/profile.boot" "$FAKE/profile.env"
 
 # pull "KEY=value" out of custom.pif.prop (first match; value may contain spaces)
 pif() { sed -n "s/^$1=//p" "$PIF" 2>/dev/null | head -n1; }
@@ -51,7 +52,7 @@ pif() { sed -n "s/^$1=//p" "$PIF" 2>/dev/null | head -n1; }
   if [ ! -f "$PIF" ]; then
     echo "WARN: no PIF at $PIF — leaving committed static fakes in place"
     echo "=== done (no-op) ==="
-    exit 0
+    exit 1
   fi
 
   BRAND=$(pif BRAND);            DEVICE=$(pif DEVICE)
@@ -69,7 +70,7 @@ pif() { sed -n "s/^$1=//p" "$PIF" 2>/dev/null | head -n1; }
   if [ -n "$missing" ]; then
     echo "WARN: profile missing:$missing — keeping committed static fakes"
     echo "=== done (fallback) ==="
-    exit 0
+    exit 1
   fi
   echo "profile: $BRAND/$DEVICE  $MODEL  fp=$FP  patch=$SECPATCH"
 
@@ -163,5 +164,6 @@ pif() { sed -n "s/^$1=//p" "$PIF" 2>/dev/null | head -n1; }
     echo "wrote + locked security_patch.txt = $SECPATCH"
   fi
 
+  cat /proc/sys/kernel/random/boot_id > "$FAKE/profile.boot"
   echo "=== done $(date) ==="
 } >> "$LOG" 2>&1

@@ -31,7 +31,14 @@ if [[ -n "${http_proxy:-}${https_proxy:-}${HTTP_PROXY:-}${HTTPS_PROXY:-}${all_pr
   echo 'Unexpected inherited proxy environment' >&2
   exit 1
 fi
-/bin/sleep 3
+# Count observed boot polls, not machine-dependent wall time (Git Bash is slower).
+for ((attempt=0; attempt<600; attempt++)); do
+  count=0; [[ ! -f "$TEST_DIR/count" ]] || read -r count < "$TEST_DIR/count"
+  [[ "$count" -lt 12 ]] || exit 0
+  /bin/sleep 0.05
+done
+echo 'Mock emulator timed out waiting for host polls' >&2
+exit 1
 MOCK
 cat > "$tmp/bin/sleep" <<'MOCK'
 #!/usr/bin/env bash

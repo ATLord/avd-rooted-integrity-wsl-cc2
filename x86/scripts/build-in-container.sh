@@ -24,6 +24,7 @@ if [[ ! -f "$kernel/.avd-patches-applied" ]]; then
   bash "$root/kernel-build/scripts/apply-patches.sh"
 fi
 python3 "$root/x86/scripts/patch-kernelsu.py" "$kernel"
+python3 "$root/kernel-build/scripts/check-boot-hooks.py" "$kernel"
 cd "$kernel"
 export ARCH=x86_64 LLVM=1 LLVM_IAS=1 CC=clang HOSTCC=clang
 export CCACHE_DIR="$src/.ccache"

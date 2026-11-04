@@ -16,4 +16,4 @@ PY
 then exit 1; fi
 KEYBOX="$keybox" bash "$root/scripts/install-device-setup.sh"
 adb -s "$ANDROID_SERIAL" shell su -c sync
-echo 'Guest data synced. Reboot the guest, then run check-device.sh.'
+echo 'Guest data synced. Activation PENDING: adb emu kill, wait for launcher exit, restart start-x11.sh, then run check-device.sh.'

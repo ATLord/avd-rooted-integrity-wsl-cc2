@@ -39,7 +39,7 @@ export TEST_DIR="$tmp" KEYBOX="$tmp/keybox.xml" PATH="$tmp/bin:$PATH"
 : > "$tmp/device.log"
 out="$(bash "$root/scripts/install-device-setup.sh" 2>&1)" || { echo "$out" >&2; echo 'Expected success' >&2; exit 1; }
 grep -q '==> done' <<<"$out" || { echo 'Missing completion message' >&2; exit 1; }
-grep -q '^OK$' <<<"$out" || { echo 'Missing device OK' >&2; exit 1; }
+grep -q '^FILES_STAGED:' <<<"$out" || { echo 'Missing device OK' >&2; exit 1; }
 grep -Fq 'chmod 644 /data/adb/tricky_store/keybox.xml' "$tmp/device.log" || { echo 'Keybox mode not set' >&2; exit 1; }
 grep -Fq 'rm -rf /data/local/tmp/avd-setup' "$tmp/device.log" || { echo 'Stage not removed' >&2; exit 1; }
 

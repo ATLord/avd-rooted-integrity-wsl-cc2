@@ -218,7 +218,7 @@ untouchable**:
 - ❌ Never add additional service restarts to the boot scripts.
 - ❌ Never run `autopif` — it overwrites `custom.pif.prop` with a drifting profile.
 
-If integrity is lost: **`adb reboot`** (cold). That re-runs the boot scripts and
+If integrity is lost: stop the emulator with **`adb emu kill`**, wait for exit, then run the platform launcher with `-no-snapshot`. This cold start re-runs the boot scripts and
 lands TEESimulator back in GENERATE mode. Nothing else.
 
 ---

@@ -17,13 +17,24 @@ features="$android_home/advancedFeatures.ini"
 if [[ -e "$features" ]]; then
   for setting in 'Wifi = on' 'VirtioWifi = off'; do
     key="${setting%% *}"
-    if grep -qiE "^[[:space:]]*$key[[:space:]]*=" "$features" && ! grep -qiE "^[[:space:]]*$key[[:space:]]*=[[:space:]]*${setting##* }[[:space:]]*$" "$features"; then
+    if grep -qiE "^[[:space:]]*${key}[[:space:]]*=" "$features" && ! grep -qiE "^[[:space:]]*${key}[[:space:]]*=[[:space:]]*${setting##* }[[:space:]]*$" "$features"; then
       echo "Conflict in $features: $key. Resolve it before creating the AVD." >&2; exit 1
     fi
   done
 fi
-echo no | "$manager" create avd -n "$name" -k "$image" -d pixel_9_pro_xl
+creation_log=$(mktemp)
+trap 'rm -f "$creation_log"' EXIT
+if ! "$manager" create avd -n "$name" -k "$image" -d pixel_9_pro_xl <<<no >"$creation_log" 2>&1; then
+  cat "$creation_log" >&2; exit 1
+fi
+cat "$creation_log"
 cfg="$avd_home/$name.avd/config.ini"
+if ! grep -qE '^hw.device.name[[:space:]]*=[[:space:]]*pixel_9_pro_xl[[:space:]]*$' "$cfg" ||
+   ! grep -qE '^hw.lcd.width[[:space:]]*=[[:space:]]*1344[[:space:]]*$' "$cfg" ||
+   ! grep -qE '^hw.lcd.height[[:space:]]*=[[:space:]]*2992[[:space:]]*$' "$cfg"; then
+  echo "ERROR: Pixel 9 Pro XL device profile not confirmed in $cfg; inspect devices.xml diagnostics. AVD retained for inspection." >&2
+  exit 1
+fi
 sed -i 's/^hw.keyboard[[:space:]]*=.*/hw.keyboard=yes/' "$cfg"
 grep -q '^hw.keyboard=' "$cfg" || echo 'hw.keyboard=yes' >> "$cfg"
 sed -i 's/^hw\.wifi\.enabled[[:space:]]*=.*/hw.wifi.enabled=yes/' "$cfg"

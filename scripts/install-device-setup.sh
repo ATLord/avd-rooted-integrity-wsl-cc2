@@ -128,9 +128,10 @@ if [ -d /data/adb/modules_update/playintegrityfix ]; then
 fi
 
 for f in /data/adb/post-fs-data.d/*.sh /data/adb/service.d/*.sh; do step chmod 0755 "$f"; done
+step rm -f /data/adb/avd-fake/profile.env
 # Always remove the staging copy (it holds the keybox), even after a failure.
 rm -rf "$STAGE"
-[ "$rc" -eq 0 ] && echo OK
+[ "$rc" -eq 0 ] && echo "FILES_STAGED: runtime activation not yet verified"
 echo "AVD_SETUP_RC=$rc"
 DEVICE
 adb push "$INSTALL_SCRIPT" "$STAGE/install.sh" >/dev/null
@@ -143,8 +144,9 @@ if ! printf '%s\n' "$install_out" | grep -qx 'AVD_SETUP_RC=0'; then
 fi
 
 echo
-echo "==> done. Apply with a clean COLD REBOOT:"
-echo "      adb reboot"
+echo "==> done staging files; activation PENDING. Apply with a clean COLD REBOOT:"
+echo "      adb emu kill"
+echo "      # Wait for emulator/launcher exit, then run x86/scripts/start-x11.sh (Windows) or scripts/start_avd.sh (Mac)."
 echo
 echo "    Do NOT 'killall keystore2 / keymint / TEESimulator' to apply this."
 echo "    A manual restart flips TEESimulator into PATCH mode and the Play"

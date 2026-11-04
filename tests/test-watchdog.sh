@@ -23,6 +23,14 @@ MOCK
 # Each sleep counts one call; after MAX_SLEEPS the watchdog loop is stopped.
 cat > "$tmp/bin/sleep" <<'MOCK'
 #!/usr/bin/env bash
+# The production 15-second delay gives the asynchronous service time to start.
+# Preserve that ordering with a bounded handshake instead of racing the mock.
+if [ "$1" = 15 ]; then
+  for ((attempt=0; attempt<100; attempt++)); do
+    [ ! -f "$TEST_DIR/relaunch-flag" ] || [ ! -f "$TEST_DIR/pid" ] || break
+    /bin/sleep 0.05
+  done
+fi
 n=$(( $(cat "$TEST_DIR/sleeps" 2>/dev/null || echo 0) + 1 ))
 echo "$n" > "$TEST_DIR/sleeps"
 if [ "$n" -ge "$MAX_SLEEPS" ]; then kill -TERM "$PPID"; fi
